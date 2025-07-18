@@ -1,0 +1,11 @@
+[package]
+name = "bad-editor"
+version = "0.1.0"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crossterm = "0.29.0"
+ropey = "1.6.1"
+unicode-segmentation = "1.12.0"
