@@ -118,6 +118,8 @@ impl App {
             if let Some(info) = &self.info {
                 writer.queue(MoveTo(0, wsize.rows - 1))?;
                 writer.queue(Print(info))?;
+                // this ensures prompt is printed in the right place!
+                writer.queue(MoveTo(0, wsize.rows - 1))?;
             }
         }
         writer.flush()?;

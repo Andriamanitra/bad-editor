@@ -1,6 +1,7 @@
 use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ropey::Rope;
 use crate::cursor::Cursor;
+use std::io::{BufReader, ErrorKind};
 
 pub(crate) enum AppState {
     Idle,
@@ -15,8 +16,11 @@ pub struct Pane {
 
 impl Pane {
     pub fn open_file(&mut self, path: &str) -> std::io::Result<()> {
-        let file = std::fs::File::open(path)?;
-        let content = Rope::from_reader(std::io::BufReader::new(file))?;
+        let content = match std::fs::File::open(path) {
+            Ok(file) => Rope::from_reader(BufReader::new(file))?,
+            Err(err) if err.kind() == ErrorKind::NotFound => Rope::new(),
+            Err(err) => return Err(err)
+        };
         self.title = path.to_string();
         self.content = content;
         self.cursors = vec![Cursor::default()];
@@ -88,6 +92,10 @@ impl App {
         }
     }
 
+    pub fn inform(&mut self, msg: String) {
+        self.info.replace(msg);
+    }
+
     pub fn current_pane_mut(&mut self) -> &mut Pane {
         self.panes
             .get_mut(self.current_pane_index)
@@ -112,7 +120,7 @@ impl App {
                 self.command_prompt();
             }
             // TODO: this shouldn't go to current pane
-            Action::SetInfo(s) => self.info = Some(s),
+            Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),
         }
     }
