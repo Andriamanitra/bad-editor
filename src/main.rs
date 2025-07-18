@@ -1,17 +1,17 @@
 mod bad;
 mod prompt;
 mod render;
+mod cursor;
 
 use std::io::stdout;
 use std::{error::Error, time::Duration};
 
-use crossterm::cursor;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    crossterm::execute!(stdout(), EnterAlternateScreen, cursor::Hide)?;
+    crossterm::execute!(stdout(), EnterAlternateScreen, crossterm::cursor::Hide)?;
     enable_raw_mode()?;
 
     // TODO: CLI
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    crossterm::execute!(stdout(), LeaveAlternateScreen, cursor::Show)?;
+    crossterm::execute!(stdout(), LeaveAlternateScreen, crossterm::cursor::Show)?;
     disable_raw_mode()?;
 
     Ok(())

@@ -1,8 +1,9 @@
-use crate::bad::{App, ByteOffset};
+use crate::bad::App;
+use crate::cursor::ByteOffset;
 
 use crossterm;
 use crossterm::{
-    cursor::{self, MoveTo},
+    cursor::MoveTo,
     style::{Color, Print, PrintStyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
     QueueableCommand,
@@ -15,7 +16,7 @@ impl App {
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
 
         writer.queue(Clear(ClearType::All))?;
-        writer.queue(cursor::Hide)?;
+        writer.queue(crossterm::cursor::Hide)?;
 
         if wsize.rows < 3 {
             writer.queue(Print("window too smol"))?;
