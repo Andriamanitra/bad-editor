@@ -1,6 +1,11 @@
 use reedline::DefaultPrompt;
 use reedline::DefaultPromptSegment;
 use reedline::Reedline;
+use reedline::ReedlineEvent;
+use reedline::EditCommand;
+use reedline::KeyCode;
+use reedline::KeyModifiers;
+
 use std::io::ErrorKind;
 
 /// Quotes strings with spaces, quotes, or control characters in them
@@ -61,7 +66,30 @@ impl crate::bad::App {
 pub fn get_command() -> Option<(String, String)> {
     // TODO: add completions, and maybe get rid of Reedline dependency
     // once our own editing capabilities are up to the task?
-    let mut ed = Reedline::create();
+
+    macro_rules! edits {
+        ( $( $x:expr ),* $(,)? ) => {
+            ReedlineEvent::Edit(vec![ $( $x ),* ])
+        };
+    }
+
+    let mut keybindings = reedline::default_emacs_keybindings();
+
+    let cancel = ReedlineEvent::Multiple(vec![edits![EditCommand::Clear], ReedlineEvent::Submit]);
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('e'), cancel.clone());
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('q'), cancel.clone());
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('d'), cancel.clone());
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('c'), edits![EditCommand::CopySelection]);
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('x'), edits![EditCommand::CutSelection]);
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('y'), edits![EditCommand::Redo]);
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('v'), edits![EditCommand::Paste]);
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('a'), edits![EditCommand::SelectAll]);
+    keybindings.add_binding(KeyModifiers::ALT, KeyCode::Char('t'), edits![EditCommand::SwapWords]);
+
+    let mut ed = Reedline::create()
+        .with_edit_mode(Box::new(reedline::Emacs::new(keybindings)))
+        .use_kitty_keyboard_enhancement(true);
+
     let prompt = DefaultPrompt {
         left_prompt: DefaultPromptSegment::Empty,
         right_prompt: DefaultPromptSegment::WorkingDirectory,
