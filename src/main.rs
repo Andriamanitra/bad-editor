@@ -1,4 +1,6 @@
 mod bad;
+mod prompt;
+mod render;
 
 use std::io::stdout;
 use std::{error::Error, time::Duration};

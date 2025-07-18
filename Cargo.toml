@@ -7,5 +7,6 @@ edition = "2024"
 
 [dependencies]
 crossterm = "0.29.0"
+reedline = "0.40.0"
 ropey = "1.6.1"
 unicode-segmentation = "1.12.0"
