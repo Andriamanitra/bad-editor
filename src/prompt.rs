@@ -38,32 +38,38 @@ fn quote_path(s: &str) -> String {
 impl crate::bad::App {
     pub fn command_prompt(&mut self) {
         self.state = crate::bad::AppState::InPrompt;
-        let Some((command, arg)) = get_command() else { return };
-        match command.as_str() {
-            "open" => match self.current_pane_mut().open_file(&arg) {
-                Ok(()) => {},
-                Err(err) => {
-                    let fpath = quote_path(&arg);
-                    self.inform(match err.kind() {
-                        ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
-                        ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
-                        _ => format!("{err}: {fpath}"),
-                    });
+        if let Some((command, arg)) = get_command() {
+            match command.as_str() {
+                "open" => match self.current_pane_mut().open_file(&arg) {
+                    Ok(()) => {},
+                    Err(err) => {
+                        let fpath = quote_path(&arg);
+                        self.inform(match err.kind() {
+                            ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
+                            ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
+                            _ => format!("{err}: {fpath}"),
+                        });
+                    }
                 }
+                _ => self.inform(format!("Unknown command '{command}'")),
             }
-            _ => self.inform(format!("Unknown command '{command}'")),
         }
         self.state = crate::bad::AppState::Idle;
     }
 }
 
 pub fn get_command() -> Option<(String, String)> {
+    // TODO: add completions, and maybe get rid of Reedline dependency
+    // once our own editing capabilities are up to the task?
     let mut ed = Reedline::create();
     let prompt = DefaultPrompt {
         left_prompt: DefaultPromptSegment::Empty,
         right_prompt: DefaultPromptSegment::WorkingDirectory,
     };
     if let Ok(reedline::Signal::Success(cmd)) = ed.read_line(&prompt) {
+        if cmd.is_empty() {
+            return None
+        }
         let (command, args) = cmd.split_once(' ').unwrap_or((&cmd, ""));
         Some((command.to_string(), args.to_string()))
     } else {
