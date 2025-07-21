@@ -12,6 +12,17 @@ use crossterm::{
 impl App {
     pub fn render(&self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         let wsize = crossterm::terminal::window_size()?;
+        let content = &self.current_pane().content;
+
+        macro_rules! slice {
+            ($range:expr) => {
+                {
+                    let start = content.byte_to_char($range.start.0);
+                    let end = content.byte_to_char($range.end.0);
+                    content.slice(start..end)
+                }
+            };
+        }
 
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
 
@@ -21,7 +32,6 @@ impl App {
         if wsize.rows < 3 {
             writer.queue(Print("window too smol"))?;
         } else {
-            let content = &self.current_pane().content;
             let (cursor_starts, cursor_ends) = {
                 let mut starts: Vec<ByteOffset> = vec![];
                 let mut ends: Vec<ByteOffset> = vec![];
@@ -69,8 +79,10 @@ impl App {
                 };
 
                 while cur_start < line_end || cur_end < line_end {
-                    let s = content.slice(byte_offset.0..cur_start.min(cur_end).0);
-                    writer.queue(Print(s.to_string().trim_end_matches('\n')))?;
+                    let s = slice!(byte_offset..cur_start.min(cur_end));
+                    for c in s.chars().take_while(|&c| c != '\n') {
+                        writer.queue(Print(c))?;
+                    }
                     if cur_start < cur_end {
                         byte_offset = cur_start;
                         starts_idx += 1;
@@ -98,7 +110,7 @@ impl App {
                     }
                 }
                 if byte_offset < line_end {
-                    let s = content.slice(byte_offset.0..line_end.0);
+                    let s = slice!(byte_offset..line_end);
                     writer.queue(Print(s.to_string().trim_end_matches('\n')))?;
                     byte_offset = line_end;
                 }
