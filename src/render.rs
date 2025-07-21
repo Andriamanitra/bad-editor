@@ -39,7 +39,6 @@ impl App {
 
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
 
-        writer.queue(Clear(ClearType::All))?;
         writer.queue(crossterm::cursor::Hide)?;
 
         if wsize.rows < 3 {
@@ -126,12 +125,16 @@ impl App {
                 if n_selections > 0 {
                     writer.queue(Print("⏎"))?;
                 }
+                set_colors!(Color::White, Color::Black);
+                writer.queue(Clear(ClearType::UntilNewLine))?;
             }
             // render cursor at the end of the file
             if starts_idx < cursor_starts.len() {
                 set_colors!(Color::Black, Color::White);
                 writer.queue(Print(" "))?;
             }
+            set_colors!(Color::White, Color::Black);
+            writer.queue(Clear(ClearType::FromCursorDown))?;
 
             writer.queue(MoveTo(0, wsize.rows - 2))?;
             set_colors!(Color::Black, Color::White);
