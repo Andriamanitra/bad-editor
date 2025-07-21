@@ -53,14 +53,36 @@ impl Pane {
                     cursor.move_right(&self.content, n);
                 }
             }
+            PaneAction::MoveCursorLineStart => {
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                    cursor.move_line_start(&self.content)
+                }
+            }
+            PaneAction::MoveCursorLineEnd => {
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                    cursor.move_line_end(&self.content)
+                }
+            }
             PaneAction::Insert(s) => {
                 self.cursors.sort_by_key(|cur| cur.offset);
                 for cursor in self.cursors.iter_mut().rev() {
                     cursor.insert(&mut self.content, &s);
                 }
             }
-            PaneAction::DeletePreviousChar => {}
-            PaneAction::DeleteNextChar => {}
+            PaneAction::DeleteBackward => {
+                self.cursors.sort_by_key(|cur| cur.offset);
+                for cursor in self.cursors.iter_mut().rev() {
+                    cursor.delete_backward(&mut self.content);
+                }
+            }
+            PaneAction::DeleteForward => {
+                self.cursors.sort_by_key(|cur| cur.offset);
+                for cursor in self.cursors.iter_mut().rev() {
+                    cursor.delete_forward(&mut self.content);
+                }
+            }
         }
     }
 }
@@ -78,7 +100,7 @@ impl App {
     pub fn new() -> Self {
         let pane = Pane {
             title: "bad.txt".to_string(),
-            content: Rope::from("bad is the best text editor\n\n".repeat(100)),
+            content: Rope::from("bad is the bäst text editor\n\n".repeat(15) + "ääää"),
             cursors: vec![Cursor::default()],
         };
 
@@ -138,9 +160,11 @@ pub enum PaneAction {
     MoveCursorDown(usize),
     MoveCursorLeft(usize),
     MoveCursorRight(usize),
+    MoveCursorLineStart,
+    MoveCursorLineEnd,
     Insert(String),
-    DeletePreviousChar,
-    DeleteNextChar,
+    DeleteBackward,
+    DeleteForward,
 }
 
 pub fn get_action(ev: &event::Event) -> Action {
@@ -170,9 +194,11 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Down => Action::HandledByPane(PaneAction::MoveCursorDown(1)),
                 KeyCode::Left => Action::HandledByPane(PaneAction::MoveCursorLeft(1)),
                 KeyCode::Right => Action::HandledByPane(PaneAction::MoveCursorRight(1)),
+                KeyCode::Home => Action::HandledByPane(PaneAction::MoveCursorLineStart),
+                KeyCode::End => Action::HandledByPane(PaneAction::MoveCursorLineEnd),
                 KeyCode::Enter => Action::HandledByPane(PaneAction::Insert("\n".into())),
-                KeyCode::Backspace => Action::HandledByPane(PaneAction::DeletePreviousChar),
-                KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteNextChar),
+                KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
+                KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
                 _ => Action::SetInfo(format!("{kevent:?}")),
             }
         }
