@@ -17,6 +17,13 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn column(&self, content: &Rope) -> usize {
+        let current_line = content.byte_to_line(self.offset.0);
+        let line_start = content.line_to_byte(current_line);
+        // FIXME: column should be offset in grapheme clusters not bytes
+        self.offset.0 - line_start
+    }
+
     pub fn deselect(&mut self) {
         self.selection_from = None;
     }

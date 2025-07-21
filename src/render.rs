@@ -24,6 +24,13 @@ impl App {
             };
         }
 
+        macro_rules! set_colors {
+            ($fg:expr, $bg:expr) => {
+                writer.queue(crossterm::style::SetForegroundColor($fg))?;
+                writer.queue(crossterm::style::SetBackgroundColor($bg))?;
+            }
+        }
+
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
 
         writer.queue(Clear(ClearType::All))?;
@@ -61,11 +68,9 @@ impl App {
                         .on(Color::Black),
                 ))?;
                 if n_selections == 0 {
-                    writer.queue(crossterm::style::SetForegroundColor(Color::White))?;
-                    writer.queue(crossterm::style::SetBackgroundColor(Color::Black))?;
+                    set_colors!(Color::White, Color::Black);
                 } else {
-                    writer.queue(crossterm::style::SetForegroundColor(Color::Black))?;
-                    writer.queue(crossterm::style::SetBackgroundColor(Color::White))?;
+                    set_colors!(Color::Black, Color::White);
                 }
 
                 let line_end = ByteOffset(content.line_to_byte(lineno + 1));
@@ -92,8 +97,7 @@ impl App {
                         };
                         n_selections += 1;
                         if n_selections == 1 {
-                            writer.queue(crossterm::style::SetForegroundColor(Color::Black))?;
-                            writer.queue(crossterm::style::SetBackgroundColor(Color::White))?;
+                            set_colors!(Color::Black, Color::White);
                         }
                     } else {
                         byte_offset = cur_end;
@@ -104,8 +108,7 @@ impl App {
                         };
                         n_selections -= 1;
                         if n_selections == 0 {
-                            writer.queue(crossterm::style::SetForegroundColor(Color::White))?;
-                            writer.queue(crossterm::style::SetBackgroundColor(Color::Black))?;
+                            set_colors!(Color::White, Color::Black);
                         }
                     }
                 }
@@ -118,15 +121,29 @@ impl App {
                     writer.queue(Print("⏎"))?;
                 }
             }
+            // render cursor at the end of the file
+            if starts_idx < cursor_starts.len() {
+                set_colors!(Color::Black, Color::White);
+                writer.queue(Print(" "))?;
+            }
+
             writer.queue(MoveTo(0, wsize.rows - 2))?;
-            let status_line = format!(
-                "{:width$}",
-                self.current_pane().title,
-                width = wsize.columns as usize
+            set_colors!(Color::Black, Color::White);
+            let width = wsize.columns as usize;
+            let status_line_title = format!("{:width$}", self.current_pane().title, width = width);
+            writer.queue(Print(status_line_title))?;
+            let cursor = &self.current_pane().cursors[0];
+            let status_line_right = format!(
+                "col:{:<3} line:{:<3} {}/{}B",
+                1 + cursor.column(&content),
+                1 + content.byte_to_line(cursor.offset.0),
+                cursor.offset.0,
+                content.len_bytes()
             );
-            writer.queue(PrintStyledContent(
-                status_line.with(Color::Black).on(Color::White),
-            ))?;
+            writer.queue(MoveTo((width - status_line_right.len()) as u16, wsize.rows - 2))?;
+            writer.queue(Print(status_line_right))?;
+
+            set_colors!(Color::White, Color::Black);
             if let Some(info) = &self.info {
                 writer.queue(MoveTo(0, wsize.rows - 1))?;
                 writer.queue(Print(info))?;
