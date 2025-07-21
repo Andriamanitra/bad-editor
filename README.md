@@ -2,9 +2,14 @@
 
 The world obviously needs more [text editors](https://github.com/stars/Andriamanitra/lists/editors) so here's one.
 
+> [!WARNING]
+> This project is in *very* early stages of development, even basic editing is not really usable yet.
+> Once it actually works I might change the name to *mediocre-editor* or something.
+
 ## Goals:
 
-(none of this is implemented yet)
+> [!IMPORTANT]
+> These are long term goals, none of them are implemented yet.
 
 * Multicursors
 * Mouse support
