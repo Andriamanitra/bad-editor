@@ -16,9 +16,12 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn current_line_number(&self, content: &Rope) -> usize {
+        content.byte_to_line(self.offset.0)
+    }
+
     pub fn column(&self, content: &Rope) -> usize {
-        let current_line = content.byte_to_line(self.offset.0);
-        let line_start = content.line_to_byte(current_line);
+        let line_start = content.line_to_byte(self.current_line_number(content));
         // FIXME: column should be offset in grapheme clusters not bytes
         self.offset.0 - line_start
     }
@@ -30,7 +33,7 @@ impl Cursor {
     // TODO: handle column offset using unicode_segmentation
 
     pub fn move_up(&mut self, content: &Rope, n: usize) {
-        let current_line = content.byte_to_line(self.offset.0);
+        let current_line = self.current_line_number(content);
         if current_line < n {
             self.offset = ByteOffset(0);
         } else {
@@ -40,7 +43,7 @@ impl Cursor {
     }
 
     pub fn move_down(&mut self, content: &Rope, n: usize) {
-        let current_line = content.byte_to_line(self.offset.0);
+        let current_line = self.current_line_number(content);
         if current_line + n > content.len_lines() {
             self.offset = ByteOffset(content.len_bytes());
         } else {
@@ -66,13 +69,12 @@ impl Cursor {
     }
 
     pub fn move_line_start(&mut self, content: &Rope) {
-        let current_line = content.byte_to_line(self.offset.0);
-        let line_start = content.line_to_byte(current_line);
+        let line_start = content.line_to_byte(self.current_line_number(content));
         self.offset = ByteOffset(line_start);
     }
 
     pub fn move_line_end(&mut self, content: &Rope) {
-        let current_line = content.byte_to_line(self.offset.0);
+        let current_line = self.current_line_number(content);
         if current_line == content.len_lines() - 1 {
             self.offset = ByteOffset(content.len_bytes());
         } else {

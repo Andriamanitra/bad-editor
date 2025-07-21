@@ -11,6 +11,9 @@ pub(crate) enum AppState {
 pub struct Pane {
     pub(crate) title: String,
     pub(crate) content: Rope,
+    pub(crate) viewport_position_row: usize,
+    pub(crate) viewport_width: u16,
+    pub(crate) viewport_height: u16,
     pub(crate) cursors: Vec<Cursor>,
 }
 
@@ -25,6 +28,32 @@ impl Pane {
         self.content = content;
         self.cursors = vec![Cursor::default()];
         Ok(())
+    }
+
+    pub fn update_viewport_size(&mut self, columns: u16, rows: u16) {
+        self.viewport_width = columns;
+        self.viewport_height = rows;
+    }
+
+    pub fn adjust_viewport(&mut self) {
+        // assume the first cursor is the primary one for now
+        let mut line_number = 0;
+        for cursor in self.cursors.iter().take(1) {
+            line_number = cursor.current_line_number(&self.content);
+        }
+        self.adjust_viewport_to_show_line(line_number);
+    }
+
+    fn adjust_viewport_to_show_line(&mut self, line_number: usize) {
+        let pad = 2;
+        let vh = self.viewport_height as usize;
+        let last_visible_line_number = self.viewport_position_row + vh;
+        if line_number < self.viewport_position_row + pad {
+            self.viewport_position_row = line_number.saturating_sub(pad);
+        } else if line_number >= last_visible_line_number.saturating_sub(pad) {
+            let desired_last_visible_line_number = (line_number + pad + 1).min(self.content.len_lines());
+            self.viewport_position_row = desired_last_visible_line_number.saturating_sub(vh);
+        }
     }
 
     fn handle_event(&mut self, event: PaneAction) {
@@ -90,8 +119,6 @@ impl Pane {
 pub struct App {
     pub(crate) panes: Vec<Pane>,
     pub(crate) current_pane_index: usize,
-    pub(crate) viewport_position_row: usize,
-    // pub(crate) viewport_position_col: usize,
     pub(crate) info: Option<String>,
     pub(crate) state: AppState,
 }
@@ -102,13 +129,15 @@ impl App {
             title: "bad.txt".to_string(),
             content: Rope::from("bad is the bäst text editor\n\n".repeat(15) + "ääää"),
             cursors: vec![Cursor::default()],
+            viewport_position_row: 0,
+            // these will be set during rendering
+            viewport_height: 0,
+            viewport_width: 0,
         };
 
         Self {
             panes: vec![pane],
             current_pane_index: 0,
-            viewport_position_row: 0,
-            // viewport_position_col: 0,
             info: None,
             state: AppState::Idle,
         }

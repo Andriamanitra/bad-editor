@@ -10,9 +10,15 @@ use crossterm::{
 };
 
 impl App {
-    pub fn render(&self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+    pub fn render(&mut self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         let wsize = crossterm::terminal::window_size()?;
-        let content = &self.current_pane().content;
+        {
+            let pane = self.current_pane_mut();
+            pane.update_viewport_size(wsize.columns, wsize.rows.saturating_sub(2));
+            pane.adjust_viewport();
+        }
+        let current_pane = &self.current_pane();
+        let content = &current_pane.content;
 
         macro_rules! slice {
             ($range:expr) => {
@@ -51,16 +57,16 @@ impl App {
                 (starts, ends)
             };
 
-            let mut byte_offset = ByteOffset(content.line_to_byte(self.viewport_position_row));
+            let mut byte_offset = ByteOffset(content.line_to_byte(self.current_pane().viewport_position_row));
             let mut starts_idx = 0;
             let mut ends_idx = 0;
             let mut n_selections = 0;
 
             let last_visible_lineno = content
                 .len_lines()
-                .min(self.viewport_position_row + wsize.rows as usize - 2);
-            for lineno in self.viewport_position_row..last_visible_lineno {
-                let console_row = (lineno - self.viewport_position_row) as u16;
+                .min(current_pane.viewport_position_row + wsize.rows as usize - 2);
+            for lineno in current_pane.viewport_position_row..last_visible_lineno {
+                let console_row = (lineno - current_pane.viewport_position_row) as u16;
                 writer.queue(MoveTo(0, console_row as u16))?;
                 writer.queue(PrintStyledContent(
                     format!("{:3} ", 1 + lineno)
