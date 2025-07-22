@@ -22,11 +22,7 @@ impl App {
 
         macro_rules! slice {
             ($range:expr) => {
-                {
-                    let start = content.byte_to_char($range.start.0);
-                    let end = content.byte_to_char($range.end.0);
-                    content.slice(start..end)
-                }
+                content.byte_slice($range.start.0 .. $range.end.0)
             };
         }
 
