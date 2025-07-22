@@ -1,6 +1,5 @@
 use ropey::Rope;
-use unicode_segmentation::GraphemeCursor;
-use unicode_segmentation::GraphemeIncomplete;
+use crate::rope_ext::RopeExt;
 
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct ByteOffset(pub usize);
@@ -21,9 +20,9 @@ impl Cursor {
     }
 
     pub fn column(&self, content: &Rope) -> usize {
-        let line_start = content.line_to_byte(self.current_line_number(content));
-        // FIXME: column should be offset in grapheme clusters not bytes
-        self.offset.0 - line_start
+        let a = content.line_to_byte(self.current_line_number(content));
+        let b = self.offset.0;
+        content.byte_slice(a..b).count_grapheme_clusters()
     }
 
     pub fn deselect(&mut self) {
@@ -134,44 +133,16 @@ impl Cursor {
     }
 
     pub fn previous_grapheme_cluster_len_bytes(&self, content: &Rope) -> usize {
-        let mut gr = GraphemeCursor::new(self.offset.0, content.len_bytes(), true);
-        let (mut chunk, mut chunk_byte_idx, _, _) = content.chunk_at_byte(self.offset.0);
-        loop {
-            match gr.prev_boundary(chunk, chunk_byte_idx) {
-                Ok(Some(n)) => return self.offset.0 - n,
-                Ok(None) => return 0,
-                Err(GraphemeIncomplete::PrevChunk) => {
-                    (chunk, chunk_byte_idx, _, _) =
-                        content.chunk_at_byte(chunk_byte_idx - 1);
-                }
-                Err(GraphemeIncomplete::PreContext(idx)) => {
-                    let (ctx_chunk, ctx_chunk_byte_idx, _, _) =
-                        content.chunk_at_byte(idx.saturating_sub(1));
-                    gr.provide_context(ctx_chunk, ctx_chunk_byte_idx);
-                }
-                Err(err) => unreachable!("{err:?} should never happen!"),
-            }
+        match content.previous_boundary_from(self.offset) {
+            Some(boundary) => self.offset.0 - boundary.0,
+            None => 0
         }
     }
 
     pub fn current_grapheme_cluster_len_bytes(&self, content: &Rope) -> usize {
-        let mut gr = GraphemeCursor::new(self.offset.0, content.len_bytes(), true);
-        let (mut chunk, mut chunk_byte_idx, _, _) = content.chunk_at_byte(self.offset.0);
-        loop {
-            match gr.next_boundary(chunk, chunk_byte_idx) {
-                Ok(Some(n)) => return n - self.offset.0,
-                Ok(None) => return 0,
-                Err(GraphemeIncomplete::NextChunk) => {
-                    (chunk, chunk_byte_idx, _, _) =
-                        content.chunk_at_byte(chunk_byte_idx + chunk.len());
-                }
-                Err(GraphemeIncomplete::PreContext(idx)) => {
-                    let (ctx_chunk, ctx_chunk_byte_idx, _, _) =
-                        content.chunk_at_byte(idx.saturating_sub(1));
-                    gr.provide_context(ctx_chunk, ctx_chunk_byte_idx);
-                }
-                Err(err) => unreachable!("{err:?} should never happen!"),
-            }
+        match content.next_boundary_from(self.offset) {
+            Some(boundary) => boundary.0 - self.offset.0,
+            None => 0
         }
     }
 

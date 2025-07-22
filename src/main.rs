@@ -2,6 +2,7 @@ mod bad;
 mod prompt;
 mod render;
 mod cursor;
+mod rope_ext;
 
 use std::io::stdout;
 use std::{error::Error, time::Duration};
