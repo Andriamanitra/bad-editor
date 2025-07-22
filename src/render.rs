@@ -119,10 +119,12 @@ impl App {
                 }
                 if byte_offset < line_end {
                     let s = slice!(byte_offset..line_end);
-                    writer.queue(Print(s.to_string().trim_end_matches('\n')))?;
+                    for c in s.chars().take_while(|&c| c != '\n') {
+                        writer.queue(Print(c))?;
+                    }
                     byte_offset = line_end;
                 }
-                if n_selections > 0 {
+                if n_selections > 0 && lineno + 1 < content.len_lines() {
                     writer.queue(Print("⏎"))?;
                 }
                 set_colors!(Color::White, Color::Black);
