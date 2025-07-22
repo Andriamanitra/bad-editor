@@ -4,6 +4,7 @@ use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ropey::Rope;
 
 use crate::Cursor;
+use crate::cursor::MoveTarget;
 
 pub(crate) enum AppState {
     Idle,
@@ -60,40 +61,15 @@ impl Pane {
 
     fn handle_event(&mut self, event: PaneAction) {
         match event {
-            PaneAction::MoveCursorUp(n) => {
+            PaneAction::MoveTo(target) => {
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
-                    cursor.move_up(&self.content, n);
+                    cursor.move_to(&self.content, target);
                 }
             }
-            PaneAction::MoveCursorDown(n) => {
+            PaneAction::SelectTo(target) => {
                 for cursor in self.cursors.iter_mut() {
-                    cursor.deselect();
-                    cursor.move_down(&self.content, n);
-                }
-            }
-            PaneAction::MoveCursorLeft(n) => {
-                for cursor in self.cursors.iter_mut() {
-                    cursor.deselect();
-                    cursor.move_left(&self.content, n);
-                }
-            }
-            PaneAction::MoveCursorRight(n) => {
-                for cursor in self.cursors.iter_mut() {
-                    cursor.deselect();
-                    cursor.move_right(&self.content, n);
-                }
-            }
-            PaneAction::MoveCursorLineStart => {
-                for cursor in self.cursors.iter_mut() {
-                    cursor.deselect();
-                    cursor.move_line_start(&self.content)
-                }
-            }
-            PaneAction::MoveCursorLineEnd => {
-                for cursor in self.cursors.iter_mut() {
-                    cursor.deselect();
-                    cursor.move_line_end(&self.content)
+                    cursor.select_to(&self.content, target);
                 }
             }
             PaneAction::Insert(s) => {
@@ -186,13 +162,10 @@ pub enum Action {
     SetInfo(String),
     HandledByPane(PaneAction),
 }
+
 pub enum PaneAction {
-    MoveCursorUp(usize),
-    MoveCursorDown(usize),
-    MoveCursorLeft(usize),
-    MoveCursorRight(usize),
-    MoveCursorLineStart,
-    MoveCursorLineEnd,
+    MoveTo(MoveTarget),
+    SelectTo(MoveTarget),
     Insert(String),
     DeleteBackward,
     DeleteForward,
@@ -215,18 +188,31 @@ pub fn get_action(ev: &event::Event) -> Action {
             },
         ) => {
             let ctrl = modifiers.contains(KeyModifiers::CONTROL);
+            let shift = modifiers.contains(KeyModifiers::SHIFT);
             let only_shift = (*modifiers - KeyModifiers::SHIFT).is_empty();
             // TODO: no hard coding, read keybindings from a config file
             match code {
                 KeyCode::Char('q') if ctrl => Action::Quit,
                 KeyCode::Char('e') if ctrl => Action::CommandPrompt,
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
-                KeyCode::Up => Action::HandledByPane(PaneAction::MoveCursorUp(1)),
-                KeyCode::Down => Action::HandledByPane(PaneAction::MoveCursorDown(1)),
-                KeyCode::Left => Action::HandledByPane(PaneAction::MoveCursorLeft(1)),
-                KeyCode::Right => Action::HandledByPane(PaneAction::MoveCursorRight(1)),
-                KeyCode::Home => Action::HandledByPane(PaneAction::MoveCursorLineStart),
-                KeyCode::End => Action::HandledByPane(PaneAction::MoveCursorLineEnd),
+                KeyCode::Up =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(1))) },
+                KeyCode::Down =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Down(1))) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(1))) },
+                KeyCode::Left =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Left(1))) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Left(1))) },
+                KeyCode::Right =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Right(1))) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Right(1))) },
+                KeyCode::Home =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::LineStart)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::LineStart)) },
+                KeyCode::End =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::LineEnd)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::LineEnd)) },
                 KeyCode::Enter => Action::HandledByPane(PaneAction::Insert("\n".into())),
                 KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),

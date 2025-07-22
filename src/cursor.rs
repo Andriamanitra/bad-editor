@@ -3,6 +3,16 @@ use ropey::Rope;
 use crate::RopeExt;
 use crate::ByteOffset;
 
+#[derive(Debug, Clone, Copy)]
+pub enum MoveTarget {
+    Up(usize),
+    Down(usize),
+    Left(usize),
+    Right(usize),
+    LineStart,
+    LineEnd,
+}
+
 #[derive(Default)]
 pub struct Cursor {
     pub(crate) offset: ByteOffset,
@@ -20,60 +30,101 @@ impl Cursor {
         content.byte_slice(a..b).count_grapheme_clusters()
     }
 
+    pub fn has_selection(&self) -> bool {
+        self.selection_from.is_some()
+    }
+
     pub fn deselect(&mut self) {
         self.selection_from = None;
     }
 
+    pub fn target_byte_offset(&self, content: &Rope, target: MoveTarget) -> ByteOffset {
+        match target {
+            MoveTarget::Up(n) => self.up(content, n),
+            MoveTarget::Down(n) => self.down(content, n),
+            MoveTarget::Left(n) => self.left(content, n),
+            MoveTarget::Right(n) => self.right(content, n),
+            MoveTarget::LineStart => self.line_start(content),
+            MoveTarget::LineEnd => self.line_end(content),
+        }
+    }
+
+    pub fn move_to(&mut self, content: &Rope, target: MoveTarget) {
+        self.deselect();
+        self.move_to_byte(self.target_byte_offset(content, target))
+    }
+
+    pub fn select_to(&mut self, content: &Rope, target: MoveTarget) {
+        self.select_to_byte(self.target_byte_offset(content, target))
+    }
+
+
+    fn move_to_byte(&mut self, new_offset: ByteOffset) {
+        self.offset = new_offset;
+    }
+
+    fn select_to_byte(&mut self, new_offset: ByteOffset) {
+        self.selection_from.get_or_insert(self.offset);
+        self.move_to_byte(new_offset);
+    }
+
     // TODO: handle column offset using unicode_segmentation
 
-    pub fn move_up(&mut self, content: &Rope, n: usize) {
+    pub fn up(&self, content: &Rope, n: usize) -> ByteOffset {
         let current_line = self.current_line_number(content);
         if current_line < n {
-            self.offset = ByteOffset(0);
+            ByteOffset(0)
         } else {
             let line_start = content.line_to_byte(current_line - n);
-            self.offset = ByteOffset(line_start);
+            ByteOffset(line_start)
         }
     }
 
-    pub fn move_down(&mut self, content: &Rope, n: usize) {
+    pub fn down(&self, content: &Rope, n: usize) -> ByteOffset {
         let current_line = self.current_line_number(content);
         if current_line + n > content.len_lines() {
-            self.offset = ByteOffset(content.len_bytes());
+            ByteOffset(content.len_bytes())
         } else {
             let line_start = content.line_to_byte(current_line + n);
-            self.offset = ByteOffset(line_start);
+            ByteOffset(line_start)
         }
     }
 
-    pub fn move_left(&mut self, content: &Rope, n: usize) {
+    pub fn left(&self, content: &Rope, n: usize) -> ByteOffset {
+        let mut p = self.offset;
         for _ in 0..n {
-            let b = self.previous_grapheme_cluster_len_bytes(content);
-            self.offset = ByteOffset(self.offset.0.saturating_sub(b));
-        }
-    }
-
-    pub fn move_right(&mut self, content: &Rope, n: usize) {
-        for _ in 0..n {
-            if self.offset < ByteOffset(content.len_bytes()) {
-                let b = self.current_grapheme_cluster_len_bytes(content);
-                self.offset = ByteOffset(self.offset.0 + b);
+            if let Some(prev) = content.previous_boundary_from(p) {
+                p = prev;
+            } else {
+                break
             }
         }
+        p
     }
 
-    pub fn move_line_start(&mut self, content: &Rope) {
-        let line_start = content.line_to_byte(self.current_line_number(content));
-        self.offset = ByteOffset(line_start);
+    pub fn right(&self, content: &Rope, n: usize) -> ByteOffset {
+        let mut p = self.offset;
+        for _ in 0..n {
+            if let Some(next) = content.next_boundary_from(p) {
+                p = next;
+            } else {
+                break
+            }
+        }
+        p
     }
 
-    pub fn move_line_end(&mut self, content: &Rope) {
+    pub fn line_start(&self, content: &Rope) -> ByteOffset {
+        ByteOffset(content.line_to_byte(self.current_line_number(content)))
+    }
+
+    pub fn line_end(&self, content: &Rope) -> ByteOffset {
         let current_line = self.current_line_number(content);
         if current_line == content.len_lines() - 1 {
-            self.offset = ByteOffset(content.len_bytes());
+            ByteOffset(content.len_bytes())
         } else {
             let next_line_start = content.line_to_byte(current_line + 1);
-            self.offset = ByteOffset(next_line_start - 1);
+            ByteOffset(next_line_start - 1)
         }
     }
 
@@ -83,48 +134,39 @@ impl Cursor {
         self.offset = ByteOffset(self.offset.0 + s.len());
     }
 
-    pub fn delete_backward(&mut self, content: &mut Rope) {
-        let char_range = match self.selection_from {
-            Some(offset) => {
-                let a = content.byte_to_char(self.offset.0);
-                let b = content.byte_to_char(offset.0);
-                if a < b {
-                    a..b
-                } else {
-                    b..a
-                }
-            },
-            None => {
-                let b = content.byte_to_char(self.offset.0);
-                self.move_left(&content, 1);
-                let a = content.byte_to_char(self.offset.0);
-                a..b
+    fn delete_selection(&mut self, content: &mut Rope) {
+        if let Some(offset) = self.selection_from {
+            let a = content.byte_to_char(self.offset.0);
+            let b = content.byte_to_char(offset.0);
+            self.selection_from.take();
+            if a < b {
+                content.remove(a..b)
+            } else {
+                self.offset = offset;
+                content.remove(b..a)
             }
-        };
-        content.remove(char_range);
+        }
+    }
+
+    pub fn delete_backward(&mut self, content: &mut Rope) {
+        if self.has_selection() {
+            self.delete_selection(content);
+        } else {
+            let b = content.byte_to_char(self.offset.0);
+            self.offset = self.left(&content, 1);
+            let a = content.byte_to_char(self.offset.0);
+            content.remove(a..b);
+        }
     }
 
     pub fn delete_forward(&mut self, content: &mut Rope) {
-        let char_range = match self.selection_from {
-            Some(offset) => {
-                let a = content.byte_to_char(self.offset.0);
-                let b = content.byte_to_char(offset.0);
-                if a < b {
-                    a..b
-                } else {
-                    b..a
-                }
-            },
-            None => {
-                let old_offset = self.offset.0;
-                self.move_right(&content, 1);
-                let a = content.byte_to_char(old_offset);
-                let b = content.byte_to_char(self.offset.0);
-                self.offset = ByteOffset(old_offset);
-                a..b
-            }
-        };
-        content.remove(char_range);
+        if self.has_selection() {
+            self.delete_selection(content);
+        } else {
+            let a = content.byte_to_char(self.offset.0);
+            let b = content.byte_to_char(self.right(content, 1).0);
+            content.remove(a..b);
+        }
     }
 
     pub fn previous_grapheme_cluster_len_bytes(&self, content: &Rope) -> usize {
@@ -183,7 +225,7 @@ mod tests {
         ];
 
         for &expected in &expected_offsets {
-            cursor.move_right(&r, 1);
+            cursor.move_to(&r, MoveTarget::Right(1));
             assert_eq!(cursor.offset.0, expected);
         }
     }
@@ -206,7 +248,7 @@ mod tests {
         ];
 
         for &expected in expected_offsets.iter().rev() {
-            cursor.move_left(&r, 1);
+            cursor.move_to(&r, MoveTarget::Left(1));
             assert_eq!(cursor.offset.0, expected, "{}", r.len_bytes());
         }
     }
@@ -243,9 +285,9 @@ mod tests {
     fn test_move_home_end() {
         let r = Rope::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
-        cursor.move_line_end(&r);
+        cursor.move_to(&r, MoveTarget::LineEnd);
         assert_eq!(cursor.offset, ByteOffset(3));
-        cursor.move_line_start(&r);
+        cursor.move_to(&r, MoveTarget::LineStart);
         assert_eq!(cursor.offset, ByteOffset(0));
     }
 
@@ -253,9 +295,9 @@ mod tests {
     fn test_move_home_end_last_line() {
         let r = Rope::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
-        cursor.move_line_start(&r);
+        cursor.move_to(&r, MoveTarget::LineStart);
         assert_eq!(cursor.offset, ByteOffset(4));
-        cursor.move_line_end(&r);
+        cursor.move_to(&r, MoveTarget::LineEnd);
         assert_eq!(cursor.offset, ByteOffset(7));
     }
 
@@ -265,29 +307,29 @@ mod tests {
         let mut cursor = Cursor { offset: ByteOffset(2), selection_from: None };
 
         // cursor should move to between e|f
-        cursor.move_down(&r, 1);
+        cursor.move_to(&r, MoveTarget::Down(1));
         assert_eq!(r.byte_to_line(cursor.offset.0), 1);
         assert_eq!(cursor.offset, ByteOffset(6));
 
         // cursor should move to the empty line between f and g
-        cursor.move_down(&r, 1);
+        cursor.move_to(&r, MoveTarget::Down(1));
         assert_eq!(r.byte_to_line(cursor.offset.0), 2);
         assert_eq!(cursor.offset, ByteOffset(8));
 
         // cursor should move to between h|i
         // (remember horizontal position from before entering the empty line)
-        cursor.move_down(&r, 1);
+        cursor.move_to(&r, MoveTarget::Down(1));
         assert_eq!(r.byte_to_line(cursor.offset.0), 3);
         assert_eq!(cursor.offset, ByteOffset(11));
 
         // back up to the empty line
-        cursor.move_up(&r, 1);
+        cursor.move_to(&r, MoveTarget::Up(1));
         assert_eq!(r.byte_to_line(cursor.offset.0), 2);
         assert_eq!(cursor.offset, ByteOffset(8));
 
         // back up to between e|f
         // (remember horizontal position from before entering the empty line)
-        cursor.move_up(&r, 1);
+        cursor.move_to(&r, MoveTarget::Up(1));
         assert_eq!(r.byte_to_line(cursor.offset.0), 1);
         assert_eq!(cursor.offset, ByteOffset(6));
     }
