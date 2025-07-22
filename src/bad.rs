@@ -1,7 +1,9 @@
+use std::io::{BufReader, ErrorKind};
+
 use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ropey::Rope;
-use crate::cursor::Cursor;
-use std::io::{BufReader, ErrorKind};
+
+use crate::Cursor;
 
 pub(crate) enum AppState {
     Idle,

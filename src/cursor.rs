@@ -1,12 +1,7 @@
 use ropey::Rope;
-use crate::rope_ext::RopeExt;
 
-#[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
-pub struct ByteOffset(pub usize);
-impl ByteOffset {
-    pub const MAX: ByteOffset = ByteOffset(usize::MAX);
-}
-
+use crate::RopeExt;
+use crate::ByteOffset;
 
 #[derive(Default)]
 pub struct Cursor {

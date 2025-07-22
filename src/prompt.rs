@@ -1,3 +1,5 @@
+use std::io::ErrorKind;
+
 use reedline::DefaultPrompt;
 use reedline::DefaultPromptSegment;
 use reedline::Reedline;
@@ -5,8 +7,6 @@ use reedline::ReedlineEvent;
 use reedline::EditCommand;
 use reedline::KeyCode;
 use reedline::KeyModifiers;
-
-use std::io::ErrorKind;
 
 /// Quotes strings with spaces, quotes, or control characters in them
 /// Only intended to provide visual clarity, does NOT make the path shell-safe!

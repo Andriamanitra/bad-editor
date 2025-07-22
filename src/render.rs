@@ -1,6 +1,3 @@
-use crate::bad::App;
-use crate::cursor::ByteOffset;
-
 use crossterm;
 use crossterm::{
     cursor::MoveTo,
@@ -8,6 +5,9 @@ use crossterm::{
     terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
     QueueableCommand,
 };
+
+use crate::bad::App;
+use crate::ByteOffset;
 
 impl App {
     pub fn render(&mut self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {

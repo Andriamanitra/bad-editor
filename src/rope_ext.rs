@@ -1,7 +1,8 @@
 use ropey;
-use crate::cursor::ByteOffset;
 use unicode_segmentation::GraphemeCursor;
 use unicode_segmentation::GraphemeIncomplete;
+
+use crate::ByteOffset;
 
 pub trait RopeExt<'a> {
     fn count_grapheme_clusters(&'a self) -> usize;

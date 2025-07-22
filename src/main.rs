@@ -1,15 +1,11 @@
-mod bad;
-mod prompt;
-mod render;
-mod cursor;
-mod rope_ext;
-
 use std::io::stdout;
 use std::{error::Error, time::Duration};
 
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+
+use bad_editor::bad;
 
 fn main() -> Result<(), Box<dyn Error>> {
     crossterm::execute!(stdout(), EnterAlternateScreen, crossterm::cursor::Hide)?;
