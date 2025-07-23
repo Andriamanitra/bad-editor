@@ -5,6 +5,7 @@ use ropey::Rope;
 
 use crate::Cursor;
 use crate::cursor::MoveTarget;
+use crate::highlighter::BadHighlighterManager;
 
 pub(crate) enum AppState {
     Idle,
@@ -99,13 +100,14 @@ pub struct App {
     pub(crate) current_pane_index: usize,
     pub(crate) info: Option<String>,
     pub(crate) state: AppState,
+    pub(crate) highlighting: BadHighlighterManager
 }
 
 impl App {
     pub fn new() -> Self {
         let pane = Pane {
             title: "bad.txt".to_string(),
-            content: Rope::from("bad is the bäst text editor\n\n".repeat(15) + "ääää"),
+            content: Rope::from("puts 'bad is the bäst text editor'\n\n".repeat(15) + "# ääää"),
             cursors: vec![Cursor::default()],
             viewport_position_row: 0,
             // these will be set during rendering
@@ -118,6 +120,7 @@ impl App {
             current_pane_index: 0,
             info: None,
             state: AppState::Idle,
+            highlighting: BadHighlighterManager::new()
         }
     }
 
@@ -148,7 +151,6 @@ impl App {
                 self.info.take();
                 self.command_prompt();
             }
-            // TODO: this shouldn't go to current pane
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),
         }

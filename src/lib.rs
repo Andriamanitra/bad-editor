@@ -3,6 +3,7 @@ mod prompt;
 mod render;
 mod cursor;
 mod rope_ext;
+mod highlighter;
 
 pub use rope_ext::RopeExt;
 pub use cursor::Cursor;
