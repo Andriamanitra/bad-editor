@@ -129,6 +129,9 @@ impl Cursor {
     }
 
     pub fn insert(&mut self, content: &mut Rope, s: &str) {
+        if self.has_selection() {
+            self.delete_selection(content);
+        }
         let char_idx = content.byte_to_char(self.offset.0);
         content.insert(char_idx, &s);
         self.offset = ByteOffset(self.offset.0 + s.len());
