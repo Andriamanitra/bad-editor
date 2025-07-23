@@ -192,7 +192,7 @@ impl Cursor {
 
     pub fn visual_end_offset(&self, content: &Rope) -> ByteOffset {
         match self.selection_from {
-            None => ByteOffset(self.offset.0 + self.current_grapheme_cluster_len_bytes(content)),
+            None => ByteOffset(self.offset.0 + self.current_grapheme_cluster_len_bytes(content).max(1)),
             Some(selection_from) => self.offset.max(selection_from),
         }
     }
