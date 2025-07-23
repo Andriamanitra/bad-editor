@@ -11,7 +11,7 @@ use syntect::highlighting::FontStyle as SyntectFontStyle;
 use crate::bad::App;
 use crate::ByteOffset;
 
-fn to_crossterm_style(syntect_style: SyntectStyle, is_selection: bool) -> ContentStyle {
+fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
     let fg = {
         let syntect::highlighting::Color {r, g, b, ..} = syntect_style.foreground;
         Color::Rgb { r, g, b }
@@ -21,9 +21,6 @@ fn to_crossterm_style(syntect_style: SyntectStyle, is_selection: bool) -> Conten
         Color::Rgb { r, g, b }
     };
     let mut style = ContentStyle::new().with(fg).on(bg);
-    if is_selection {
-        style = style.negative()
-    }
     if syntect_style.font_style.contains(SyntectFontStyle::UNDERLINE) {
         style = style.underlined();
     }
@@ -46,9 +43,13 @@ impl App {
         }
         let current_pane = &self.current_pane();
         let content = &current_pane.content;
+        let tab_width = current_pane.settings.tab_width;
         let default_style = ContentStyle::new()
             .with(Color::White)
             .on(Color::Rgb { r: 0x1a, g: 0x1a, b: 0x1a });
+        let sel_style = ContentStyle::new()
+            .with(Color::Black)
+            .on(Color::Green);
         let lineno_style = ContentStyle::new()
             .with(Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa })
             .on(Color::Rgb { r: 0x24, g: 0x24, b: 0x24 });
@@ -56,7 +57,7 @@ impl App {
         macro_rules! peek {
             ($it:expr) => {
                 match $it.peek() {
-                    Some(Cur::Start(b) | Cur::End(b)) => *b,
+                    Some(Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b)) => *b,
                     None => ByteOffset::MAX
                 }
             }
@@ -66,6 +67,7 @@ impl App {
         enum Cur {
             Start(ByteOffset),
             End(ByteOffset),
+            NoSelection(ByteOffset),
         }
 
         let mut hl = self.highlighting.get_highlighter_for_file_ext("rb");
@@ -79,11 +81,15 @@ impl App {
             let mut curs = {
                 let mut curs: Vec<Cur> = vec![];
                 for cursor in self.current_pane().cursors.iter() {
-                    curs.push(Cur::Start(cursor.visual_start_offset()));
-                    curs.push(Cur::End(cursor.visual_end_offset(&content)));
+                    if cursor.has_selection() {
+                        curs.push(Cur::Start(cursor.visual_start_offset()));
+                        curs.push(Cur::End(cursor.visual_end_offset(&content)));
+                    } else {
+                        curs.push(Cur::NoSelection(cursor.offset));
+                    }
                 }
                 curs.sort_unstable_by_key(|c| match c {
-                    Cur::Start(b) | Cur::End(b) => *b
+                    Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b) => *b
                 });
                 curs.into_iter().peekable()
             };
@@ -91,8 +97,18 @@ impl App {
             let mut byte_offset = ByteOffset(0);
             let mut n_selections = 0;
 
+            let last_visible_lineno = current_pane.viewport_position_row + current_pane.viewport_height as usize;
+            let max_lineno_width = {
+                let mut n = content.len_lines();
+                let mut w = 1;
+                while n > 9 {
+                    n = n / 10;
+                    w += 1;
+                }
+                w
+            };
             for (lineno, line) in content.lines().enumerate() {
-                if lineno > current_pane.viewport_position_row + current_pane.viewport_height as usize {
+                if lineno > last_visible_lineno {
                     break
                 }
                 let line = line.to_string();
@@ -104,44 +120,61 @@ impl App {
 
                 let console_row = (lineno - current_pane.viewport_position_row) as u16;
                 writer.queue(MoveTo(0, console_row as u16))?;
-                writer.queue(PrintStyledContent(lineno_style.apply(format!("{:3} ", 1 + lineno))))?;
+                let sidebar = format!(" {:width$} ", 1 + lineno, width=max_lineno_width);
+                writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
 
-                while peek!(curs) <= byte_offset {
-                    match curs.peek().unwrap() {
-                        Cur::Start(_) => n_selections += 1,
-                        Cur::End(_) => n_selections -= 1,
-                    }
-                    curs.next();
-                }
-                for (style, mut s) in hl.highlight(&line) {
-                    macro_rules! print_fragment {
-                        ($it:expr) => {
-                            let xtyle = to_crossterm_style(style, n_selections > 0);
-                            byte_offset.0 += $it.len();
-                            if $it.ends_with('\n') {
-                                writer.queue(PrintStyledContent(xtyle.apply($it.trim_end_matches('\n'))))?;
-                                if n_selections > 0 {
-                                    writer.queue(PrintStyledContent(xtyle.apply("⏎")))?;
+                for (style, s) in hl.highlight(&line) {
+                    let xtyle = to_crossterm_style(style);
+                    for (i, c) in s.char_indices() {
+                        let mut is_cursor = false;
+                        let pos = ByteOffset(byte_offset.0 + i);
+                        while peek!(curs) <= pos {
+                            match curs.peek() {
+                                Some(Cur::Start(_)) => n_selections += 1,
+                                Some(Cur::End(_)) => n_selections -= 1,
+                                Some(Cur::NoSelection(b)) if b == &pos => {
+                                    is_cursor = true;
                                 }
-                            } else {
-                                writer.queue(PrintStyledContent(xtyle.apply($it)))?;
+                                _ => {}
                             }
+                            curs.next();
+                        }
+                        if c == '\t' {
+                            // '\t' is variable width depending on current column!
+                            let tab_width = {
+                                let cursor_pos = crossterm::cursor::position().unwrap_or((0, 0));
+                                let cur_col = (cursor_pos.0 as usize).saturating_sub(sidebar.len());
+                                tab_width - (cur_col % tab_width)
+                            };
+                            if n_selections > 0 {
+                                writer.queue(PrintStyledContent(sel_style.apply(" ".repeat(tab_width))))?;
+                            } else if is_cursor {
+                                // when cursor is placed before '\t' only show one space as cursor
+                                // rather than the full width of the tab
+                                writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
+                                writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width - 1))))?;
+                            } else {
+                                writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width))))?;
+                            }
+                        } else if c == '\n' {
+                            if n_selections > 0 {
+                                writer.queue(PrintStyledContent(sel_style.apply("⏎")))?;
+                            } else if is_cursor {
+                                writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
+                            }
+                        } else {
+                            let styled =
+                                if n_selections > 0 {
+                                    sel_style.apply(c)
+                                } else if is_cursor {
+                                    xtyle.reverse().apply(c)
+                                } else {
+                                    xtyle.apply(c)
+                                };
+                            writer.queue(PrintStyledContent(styled))?;
                         }
                     }
-
-                    let token_end = ByteOffset(byte_offset.0 + s.len());
-                    while peek!(curs) < token_end {
-                        let length = peek!(curs).0 - byte_offset.0;
-                        print_fragment!(&s[..length]);
-                        s = &s[length..];
-
-                        match curs.peek().unwrap() {
-                            Cur::Start(_) => n_selections += 1,
-                            Cur::End(_) => n_selections -= 1,
-                        }
-                        curs.next();
-                    }
-                    print_fragment!(&s);
+                    byte_offset.0 += s.len();
                     writer.queue(crossterm::style::SetStyle(default_style))?;
                     writer.queue(Clear(ClearType::UntilNewLine))?;
                 }

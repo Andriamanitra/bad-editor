@@ -3,13 +3,30 @@ use std::io::{BufReader, ErrorKind};
 use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ropey::Rope;
 
+use crate::ByteOffset;
 use crate::Cursor;
+use crate::IndentKind;
 use crate::cursor::MoveTarget;
 use crate::highlighter::BadHighlighterManager;
 
 pub(crate) enum AppState {
     Idle,
     InPrompt,
+}
+
+#[derive(Debug)]
+pub struct PaneSettings {
+    pub tab_width: usize,
+    pub indent_kind: IndentKind
+}
+
+impl std::default::Default for PaneSettings {
+    fn default() -> Self {
+        PaneSettings {
+            tab_width: 4,
+            indent_kind: IndentKind::default()
+        }
+    }
 }
 
 pub struct Pane {
@@ -19,6 +36,7 @@ pub struct Pane {
     pub(crate) viewport_width: u16,
     pub(crate) viewport_height: u16,
     pub(crate) cursors: Vec<Cursor>,
+    pub(crate) settings: PaneSettings
 }
 
 impl Pane {
@@ -60,6 +78,46 @@ impl Pane {
         }
     }
 
+    fn indent_lines(&mut self, line_span: std::ops::Range<usize>, indent: IndentKind) {
+        let indent = indent.string();
+        for lineno in line_span {
+            let bpos = ByteOffset(self.content.line_to_byte(lineno));
+            let cpos = self.content.line_to_char(lineno);
+            self.content.insert(cpos, &indent);
+            for cursor in self.cursors.iter_mut() {
+                cursor.update_pos_insertion(bpos, indent.len());
+            }
+        }
+    }
+
+    fn dedent_lines(&mut self, line_span: std::ops::Range<usize>, indent: IndentKind) {
+        for lineno in line_span {
+            let bpos = ByteOffset(self.content.line_to_byte(lineno));
+            let cpos = self.content.line_to_char(lineno);
+            match indent {
+                IndentKind::Spaces(n) => {
+                    let n = n as usize;
+                    if self.content.chars_at(cpos).take(n).filter(|&c| c == ' ').count() == n {
+                        self.content.remove(cpos..cpos + n);
+                        let removed = bpos .. ByteOffset(bpos.0 + n);
+                        for cursor in self.cursors.iter_mut() {
+                            cursor.update_pos_deletion(&removed);
+                        }
+                    }
+                }
+                IndentKind::Tabs => {
+                    if self.content.char(cpos) == '\t' {
+                        self.content.remove(cpos..cpos+1);
+                        let removed = bpos .. ByteOffset(bpos.0 + 1);
+                        for cursor in self.cursors.iter_mut() {
+                            cursor.update_pos_deletion(&removed);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn handle_event(&mut self, event: PaneAction) {
         match event {
             PaneAction::MoveTo(target) => {
@@ -91,6 +149,18 @@ impl Pane {
                     cursor.delete_forward(&mut self.content);
                 }
             }
+            PaneAction::Indent => {
+                let line_spans: Vec<_> = self.cursors.iter().map(|c| c.line_span(&self.content)).collect();
+                for span in line_spans {
+                    self.indent_lines(span, self.settings.indent_kind);
+                }
+            }
+            PaneAction::Dedent => {
+                let line_spans: Vec<_> = self.cursors.iter().map(|c| c.line_span(&self.content)).collect();
+                for span in line_spans {
+                    self.dedent_lines(span, self.settings.indent_kind);
+                }
+            }
         }
     }
 }
@@ -113,6 +183,7 @@ impl App {
             // these will be set during rendering
             viewport_height: 0,
             viewport_width: 0,
+            settings: PaneSettings::default(),
         };
 
         Self {
@@ -171,6 +242,8 @@ pub enum PaneAction {
     Insert(String),
     DeleteBackward,
     DeleteForward,
+    Indent,
+    Dedent
 }
 
 pub fn get_action(ev: &event::Event) -> Action {
@@ -224,6 +297,8 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::PageUp => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(25))),
                 KeyCode::PageDown => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(25))),
                 KeyCode::Enter => Action::HandledByPane(PaneAction::Insert("\n".into())),
+                KeyCode::Tab => Action::HandledByPane(PaneAction::Indent),
+                KeyCode::BackTab => Action::HandledByPane(PaneAction::Dedent),
                 KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
                 _ => Action::SetInfo(format!("{kevent:?}")),

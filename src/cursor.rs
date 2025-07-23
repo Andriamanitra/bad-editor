@@ -37,7 +37,7 @@ impl Cursor {
     }
 
     pub fn deselect(&mut self) {
-        self.selection_from = None;
+        self.selection_from.take();
     }
 
     pub fn target_byte_offset(&self, content: &Rope, target: MoveTarget) -> ByteOffset {
@@ -65,6 +65,9 @@ impl Cursor {
 
     fn move_to_byte(&mut self, new_offset: ByteOffset) {
         self.offset = new_offset;
+        if self.selection_from == Some(self.offset) {
+            self.deselect();
+        }
     }
 
     fn select_to_byte(&mut self, new_offset: ByteOffset) {
@@ -132,13 +135,62 @@ impl Cursor {
         }
     }
 
+    pub fn update_pos_deletion(&mut self, del: &std::ops::Range<ByteOffset>) {
+        if self.offset > del.end {
+            self.offset.0 -= del.end.0 - del.start.0;
+        } else if self.offset > del.start {
+            self.offset.0 = del.start.0;
+        }
+        if let Some(sel) = self.selection_from {
+            if sel > del.end {
+                let length = del.end.0 - del.start.0;
+                self.selection_from.replace(ByteOffset(sel.0 - length));
+            } else if sel > del.start {
+                self.selection_from.replace(ByteOffset(del.start.0));
+            }
+        }
+        if self.selection_from == Some(self.offset) {
+            self.selection_from.take();
+        }
+    }
+
+    pub fn update_pos_insertion(&mut self, pos: ByteOffset, length: usize) {
+        if pos <= self.offset {
+            self.offset.0 += length;
+        }
+        if let Some(mut sel) = self.selection_from {
+            if pos <= sel {
+                sel.0 += length;
+            }
+        }
+    }
+
+    pub fn line_span(&self, content: &Rope) -> std::ops::Range<usize> {
+        match self.selection_from {
+            Some(sel) if sel < self.offset => {
+                let lineno_start = content.byte_to_line(sel.0);
+                let lineno_end = content.byte_to_line(self.offset.0);
+                lineno_start..lineno_end+1
+            }
+            Some(sel) => {
+                let lineno_start = content.byte_to_line(self.offset.0);
+                let lineno_end = content.byte_to_line(sel.0);
+                lineno_start..lineno_end+1
+            }
+            None => {
+                let lineno = content.byte_to_line(self.offset.0);
+                lineno..lineno+1
+            }
+        }
+    }
+
     pub fn insert(&mut self, content: &mut Rope, s: &str) {
         if self.has_selection() {
             self.delete_selection(content);
         }
         let char_idx = content.byte_to_char(self.offset.0);
         content.insert(char_idx, &s);
-        self.offset = ByteOffset(self.offset.0 + s.len());
+        self.move_to_byte(ByteOffset(self.offset.0 + s.len()));
     }
 
     fn delete_selection(&mut self, content: &mut Rope) {
@@ -149,7 +201,7 @@ impl Cursor {
             if a < b {
                 content.remove(a..b)
             } else {
-                self.offset = offset;
+                self.move_to_byte(offset);
                 content.remove(b..a)
             }
         }
@@ -160,7 +212,7 @@ impl Cursor {
             self.delete_selection(content);
         } else {
             let b = content.byte_to_char(self.offset.0);
-            self.offset = self.left(&content, 1);
+            self.move_to_byte(self.left(&content, 1));
             let a = content.byte_to_char(self.offset.0);
             content.remove(a..b);
         }
