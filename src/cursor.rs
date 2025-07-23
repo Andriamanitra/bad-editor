@@ -9,8 +9,10 @@ pub enum MoveTarget {
     Down(usize),
     Left(usize),
     Right(usize),
-    LineStart,
-    LineEnd,
+    Start,
+    End,
+    StartOfLine,
+    EndOfLine,
 }
 
 #[derive(Default)]
@@ -44,8 +46,10 @@ impl Cursor {
             MoveTarget::Down(n) => self.down(content, n),
             MoveTarget::Left(n) => self.left(content, n),
             MoveTarget::Right(n) => self.right(content, n),
-            MoveTarget::LineStart => self.line_start(content),
-            MoveTarget::LineEnd => self.line_end(content),
+            MoveTarget::Start => ByteOffset(0),
+            MoveTarget::End => ByteOffset(content.len_bytes()),
+            MoveTarget::StartOfLine => self.line_start(content),
+            MoveTarget::EndOfLine => self.line_end(content),
         }
     }
 
@@ -288,9 +292,9 @@ mod tests {
     fn test_move_home_end() {
         let r = Rope::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
-        cursor.move_to(&r, MoveTarget::LineEnd);
+        cursor.move_to(&r, MoveTarget::EndOfLine);
         assert_eq!(cursor.offset, ByteOffset(3));
-        cursor.move_to(&r, MoveTarget::LineStart);
+        cursor.move_to(&r, MoveTarget::StartOfLine);
         assert_eq!(cursor.offset, ByteOffset(0));
     }
 
@@ -298,9 +302,9 @@ mod tests {
     fn test_move_home_end_last_line() {
         let r = Rope::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
-        cursor.move_to(&r, MoveTarget::LineStart);
+        cursor.move_to(&r, MoveTarget::StartOfLine);
         assert_eq!(cursor.offset, ByteOffset(4));
-        cursor.move_to(&r, MoveTarget::LineEnd);
+        cursor.move_to(&r, MoveTarget::EndOfLine);
         assert_eq!(cursor.offset, ByteOffset(7));
     }
 

@@ -209,12 +209,20 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Right =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Right(1))) }
                     else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Right(1))) },
+                KeyCode::Home if ctrl =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Start)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Start)) },
                 KeyCode::Home =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::LineStart)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::LineStart)) },
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::StartOfLine)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::StartOfLine)) },
+                KeyCode::End if ctrl =>
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::End)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::End)) },
                 KeyCode::End =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::LineEnd)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::LineEnd)) },
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::EndOfLine)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::EndOfLine)) },
+                KeyCode::PageUp => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(25))),
+                KeyCode::PageDown => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(25))),
                 KeyCode::Enter => Action::HandledByPane(PaneAction::Insert("\n".into())),
                 KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
