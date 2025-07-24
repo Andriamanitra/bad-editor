@@ -76,7 +76,7 @@ impl App {
             NoSelection(ByteOffset),
         }
 
-        let mut hl = self.highlighting.get_highlighter_for_file_ext("rb");
+        let mut hl = self.highlighting.highlighter_for_file(&current_pane.title);
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
 
         if wsize.rows < 3 {

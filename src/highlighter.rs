@@ -8,21 +8,19 @@ use syntect::highlighting::Color;
 use syntect::highlighting::Style;
 use syntect::highlighting::Theme;
 use syntect::highlighting::ThemeItem;
-use syntect::highlighting::ThemeSet;
 use syntect::highlighting::ThemeSettings;
 use syntect::highlighting::ScopeSelectors;
 use syntect::highlighting::StyleModifier;
 
 pub struct BadHighlighterManager {
+    theme: Theme,
     syntax_set: SyntaxSet,
-    theme_set: ThemeSet,
 }
 
 impl BadHighlighterManager {
     pub fn new() -> Self {
         // TODO: read syntaxes from file, the built-in ones are outdated!
         let syntax_set = SyntaxSet::load_defaults_newlines();
-        let mut theme_set = ThemeSet::load_defaults();
 
         macro_rules! theme_scopes {
             ( $( $scope:literal = $fg:literal )* ) => {
@@ -41,7 +39,7 @@ impl BadHighlighterManager {
             }
         }
 
-        let default_theme = Theme {
+        let theme = Theme {
             name: Some("default".into()),
             author: Some("Andriamanitra".into()),
             settings: ThemeSettings {
@@ -64,14 +62,15 @@ impl BadHighlighterManager {
                 "punctuation.section" = "#D8D8D2"
             ]
         };
-        theme_set.themes.insert("default".to_string(), default_theme);
-        Self { syntax_set, theme_set }
+        Self { theme, syntax_set }
     }
 
-    pub fn get_highlighter_for_file_ext<'a>(&'a self, file_ext: &str) -> BadHighlighter<'a> {
-        let syntax = self.syntax_set.find_syntax_by_extension(file_ext).unwrap();
-        let theme = self.theme_set.themes.get("default").unwrap();
-        let highlighter = HighlightLines::new(syntax, &theme);
+    pub fn highlighter_for_file<'a>(&'a self, file_path: &str) -> BadHighlighter<'a> {
+        let syntax = match self.syntax_set.find_syntax_for_file(file_path) {
+            Ok(Some(s)) => s,
+            _ => self.syntax_set.find_syntax_plain_text()
+        };
+        let highlighter = HighlightLines::new(syntax, &self.theme);
         BadHighlighter {
             ss: &self.syntax_set,
             highlighter
