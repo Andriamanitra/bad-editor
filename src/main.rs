@@ -1,35 +1,12 @@
-use std::io::stdout;
-use std::{error::Error, time::Duration};
-
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-};
-
 use bad_editor::bad;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    crossterm::execute!(stdout(), EnterAlternateScreen, crossterm::cursor::Hide)?;
-    enable_raw_mode()?;
-
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO: CLI
-    let mut app = bad::App::new();
+    let app = bad::App::new();
 
-    const POLL_TIMEOUT: Duration = Duration::from_millis(16);
+    crossterm::terminal::enable_raw_mode()?;
+    let result = app.run(&mut std::io::stdout());
+    crossterm::terminal::disable_raw_mode()?;
 
-    app.render(&mut stdout())?;
-    loop {
-        if crossterm::event::poll(POLL_TIMEOUT)? {
-            let event = crossterm::event::read()?;
-            match bad::get_action(&event) {
-                bad::Action::Quit => break,
-                action => app.handle_action(action),
-            }
-            app.render(&mut stdout())?;
-        }
-    }
-
-    crossterm::execute!(stdout(), LeaveAlternateScreen, crossterm::cursor::Show)?;
-    disable_raw_mode()?;
-
-    Ok(())
+    result
 }
