@@ -118,6 +118,14 @@ impl Pane {
         }
     }
 
+    /// Called when Esc is pressed, removes selections and extra cursors
+    fn esc(&mut self) {
+        self.cursors.truncate(1);
+        for cursor in self.cursors.iter_mut() {
+            cursor.deselect();
+        }
+    }
+
     fn handle_event(&mut self, event: PaneAction) {
         match event {
             PaneAction::MoveTo(target) => {
@@ -218,6 +226,10 @@ impl App {
         match action {
             Action::None => (),
             Action::Quit => (),
+            Action::Esc => {
+                self.current_pane_mut().esc();
+                self.info.take();
+            }
             Action::CommandPrompt => {
                 self.info.take();
                 self.command_prompt();
@@ -231,6 +243,7 @@ impl App {
 pub enum Action {
     None,
     Quit,
+    Esc,
     CommandPrompt,
     SetInfo(String),
     HandledByPane(PaneAction),
@@ -301,6 +314,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::BackTab => Action::HandledByPane(PaneAction::Dedent),
                 KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
+                KeyCode::Esc => Action::Esc,
                 _ => Action::SetInfo(format!("{kevent:?}")),
             }
         }
