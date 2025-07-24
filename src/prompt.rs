@@ -7,8 +7,10 @@ use reedline::ReedlineEvent;
 use reedline::EditCommand;
 use reedline::KeyCode;
 use reedline::KeyModifiers;
+use unicode_names2;
 
 use crate::Action;
+use crate::PaneAction;
 
 /// Quotes strings with spaces, quotes, or control characters in them
 /// Only intended to provide visual clarity, does NOT make the path shell-safe!
@@ -48,6 +50,12 @@ impl crate::bad::App {
         if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
+                "insertchar" | "c" => {
+                    match unicode_names2::character(&arg) {
+                        Some(c) => self.enqueue(Action::HandledByPane(PaneAction::Insert(c.to_string()))),
+                        None => self.inform(format!("No character with name {:?}", arg))
+                    }
+                }
                 "open" => match self.current_pane_mut().open_file(&arg) {
                     Ok(()) => {},
                     Err(err) => {
@@ -80,6 +88,7 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
 
     let cancel = ReedlineEvent::Multiple(vec![edits![EditCommand::Clear], ReedlineEvent::Submit]);
     keybindings.add_binding(KeyModifiers::NONE, KeyCode::Esc, cancel.clone());
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Submit);
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('e'), cancel.clone());
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('q'), cancel.clone());
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('d'), cancel.clone());
