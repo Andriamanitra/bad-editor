@@ -78,6 +78,7 @@ impl App {
 
         let mut hl = self.highlighting.highlighter_for_file(&current_pane.title);
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
+        writer.queue(crossterm::cursor::Hide)?;
 
         if wsize.rows < 3 {
             writer.queue(Print("window too smol"))?;
