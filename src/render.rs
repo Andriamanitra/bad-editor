@@ -130,6 +130,8 @@ impl App {
 
                 for (style, s) in hl.highlight(&line) {
                     let xtyle = to_crossterm_style(style);
+                    // visual_column = None means it's currently unknown
+                    let mut visual_column = Some(0);
                     for (i, c) in s.char_indices() {
                         let mut is_cursor = false;
                         let pos = ByteOffset(byte_offset.0 + i);
@@ -146,10 +148,16 @@ impl App {
                         }
                         if c == '\t' {
                             // '\t' is variable width depending on current column!
-                            let tab_width = {
-                                let cursor_pos = crossterm::cursor::position().unwrap_or((0, 0));
-                                let cur_col = (cursor_pos.0 as usize).saturating_sub(sidebar.len());
-                                tab_width - (cur_col % tab_width)
+                            let tab_width = match visual_column {
+                                Some(n) => tab_width - (n % tab_width),
+                                None => match crossterm::cursor::position() {
+                                    Ok((col, _row)) => {
+                                        let cur_col = (col as usize).saturating_sub(sidebar.len());
+                                        visual_column.replace(cur_col);
+                                        tab_width - (cur_col % tab_width)
+                                    }
+                                    Err(_) => tab_width
+                                }
                             };
                             if n_selections > 0 {
                                 writer.queue(PrintStyledContent(sel_style.apply(" ".repeat(tab_width))))?;
@@ -161,6 +169,7 @@ impl App {
                             } else {
                                 writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width))))?;
                             }
+                            visual_column = visual_column.map(|offset| offset + tab_width);
                         } else if c == '\n' {
                             if n_selections > 0 {
                                 writer.queue(PrintStyledContent(sel_style.with(BLUEISH).apply("⏎")))?;
@@ -178,6 +187,7 @@ impl App {
                                     escaped_style
                                 };
                             writer.queue(PrintStyledContent(style.apply(disp)))?;
+                            visual_column = visual_column.map(|offset| offset + 4);
                         } else {
                             let styled =
                                 if n_selections > 0 {
@@ -188,6 +198,11 @@ impl App {
                                     xtyle.apply(c)
                                 };
                             writer.queue(PrintStyledContent(styled))?;
+                            if c.is_ascii() {
+                                visual_column = visual_column.map(|offset| offset + 1);
+                            } else {
+                                visual_column = None;
+                            }
                         }
                     }
                     byte_offset.0 += s.len();
