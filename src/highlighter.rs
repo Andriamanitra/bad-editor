@@ -50,14 +50,16 @@ impl BadHighlighterManager {
             scopes: theme_scopes![
                 "string,punctuation.definition.string" = "#E6DB74"
                 "comment" = "#75715E"
-                "keyword" = "#D6006B"
+                "keyword,storage" = "#D6006B"
                 "constant" = "#AE81FF"
                 "entity.name" = "#66D9EF"
+                "storage.type,entity.name.type,support.type,meta.type" = "#4A9CAB"
                 "diff.inserted" = "#30CF50"
                 "diff.changed" = "#FFAF00"
                 "diff.deleted" = "#DB0000"
                 "support.function.builtin" = "#66D9EF"
                 "string.regexp" = "#D92682"
+                "support.macro,entity.name.macro,keyword.declaration.macro" = "#A6E22E"
                 "meta.interpolation" = "#FFFFFF"
                 "punctuation.section" = "#D8D8D2"
             ]
