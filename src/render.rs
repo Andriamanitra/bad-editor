@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crossterm;
 use crossterm::{
     cursor::MoveTo,
@@ -35,6 +37,7 @@ fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
 
 impl App {
     pub fn render(&mut self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        let now = Instant::now();
         let wsize = crossterm::terminal::window_size()?;
         {
             let pane = self.current_pane_mut();
@@ -204,10 +207,13 @@ impl App {
             writer.queue(MoveTo((width - status_line_right.len()) as u16, wsize.rows - 2))?;
             writer.queue(PrintStyledContent(default_style.negative().apply(status_line_right)))?;
 
-            if let Some(info) = &self.info {
-                writer.queue(MoveTo(0, wsize.rows - 1))?;
-                writer.queue(Print(format!("{:.width$}", &info, width = wsize.columns as usize)))?;
-            }
+            writer.queue(MoveTo(0, wsize.rows - 1))?;
+            writer.queue(Print(
+                match &self.info {
+                    Some(info) => format!("{:.width$}", &info, width = wsize.columns as usize),
+                    None => format!("render took {:.3?}", now.elapsed()),
+                }
+            ))?;
             // this ensures prompt is printed in the right place!
             writer.queue(MoveTo(0, wsize.rows - 1))?;
         }
