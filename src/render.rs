@@ -35,6 +35,14 @@ fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
     style
 }
 
+const BLUEISH: Color = Color::Rgb {  r: 0x3a, g: 0x44, b: 0x5e };
+const DEFAULT_FG: Color = Color::White;
+const DEFAULT_BG: Color = Color::Rgb { r: 0x1a, g: 0x1a, b: 0x1a };
+const SELECTION_FG: Color = Color::Black;
+const SELECTION_BG: Color = Color::Rgb { r: 0x88, g: 0xff, b: 0xc5 };
+const LIGHT_GREY: Color = Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa };
+const LIGHTER_BG: Color = Color::Rgb { r: 0x24, g: 0x24, b: 0x24 };
+
 impl App {
     pub fn render(&mut self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         let now = Instant::now();
@@ -47,15 +55,10 @@ impl App {
         let current_pane = &self.current_pane();
         let content = &current_pane.content;
         let tab_width = current_pane.settings.tab_width;
-        let default_style = ContentStyle::new()
-            .with(Color::White)
-            .on(Color::Rgb { r: 0x1a, g: 0x1a, b: 0x1a });
-        let sel_style = ContentStyle::new()
-            .with(Color::Black)
-            .on(Color::Green);
-        let lineno_style = ContentStyle::new()
-            .with(Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa })
-            .on(Color::Rgb { r: 0x24, g: 0x24, b: 0x24 });
+        let default_style = ContentStyle::new().with(DEFAULT_FG).on(DEFAULT_BG);
+        let sel_style = ContentStyle::new().with(SELECTION_FG).on(SELECTION_BG);
+        let escaped_style = ContentStyle::new().with(DEFAULT_FG).on(BLUEISH);
+        let lineno_style = ContentStyle::new().with(LIGHT_GREY).on(LIGHTER_BG);
 
         macro_rules! peek {
             ($it:expr) => {
@@ -75,8 +78,6 @@ impl App {
 
         let mut hl = self.highlighting.get_highlighter_for_file_ext("rb");
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
-
-        writer.queue(crossterm::cursor::Hide)?;
 
         if wsize.rows < 3 {
             writer.queue(Print("window too smol"))?;
@@ -161,10 +162,21 @@ impl App {
                             }
                         } else if c == '\n' {
                             if n_selections > 0 {
-                                writer.queue(PrintStyledContent(sel_style.apply("⏎")))?;
+                                writer.queue(PrintStyledContent(sel_style.with(BLUEISH).apply("⏎")))?;
                             } else if is_cursor {
                                 writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
                             }
+                        } else if c.is_control() {
+                            let disp = format!("<{:02}>", c as u32);
+                            let style =
+                                if n_selections > 0 {
+                                    sel_style.with(BLUEISH)
+                                } else if is_cursor {
+                                    escaped_style.reverse()
+                                } else {
+                                    escaped_style
+                                };
+                            writer.queue(PrintStyledContent(style.apply(disp)))?;
                         } else {
                             let styled =
                                 if n_selections > 0 {
