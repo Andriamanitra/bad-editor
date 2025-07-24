@@ -2,18 +2,7 @@ use ropey::Rope;
 
 use crate::RopeExt;
 use crate::ByteOffset;
-
-#[derive(Debug, Clone, Copy)]
-pub enum MoveTarget {
-    Up(usize),
-    Down(usize),
-    Left(usize),
-    Right(usize),
-    Start,
-    End,
-    StartOfLine,
-    EndOfLine,
-}
+use crate::MoveTarget;
 
 #[derive(Default)]
 pub struct Cursor {

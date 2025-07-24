@@ -33,3 +33,36 @@ impl IndentKind {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum Action {
+    None,
+    Quit,
+    Esc,
+    CommandPrompt,
+    SetInfo(String),
+    HandledByPane(PaneAction),
+}
+
+#[derive(Debug, Clone)]
+pub enum PaneAction {
+    MoveTo(MoveTarget),
+    SelectTo(MoveTarget),
+    Insert(String),
+    DeleteBackward,
+    DeleteForward,
+    Indent,
+    Dedent
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MoveTarget {
+    Up(usize),
+    Down(usize),
+    Left(usize),
+    Right(usize),
+    Start,
+    End,
+    StartOfLine,
+    EndOfLine,
+}

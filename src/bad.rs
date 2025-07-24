@@ -1,12 +1,13 @@
 use std::io::{BufReader, ErrorKind};
+use std::collections::VecDeque;
 
-use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ropey::Rope;
 
+use crate::Action;
 use crate::ByteOffset;
 use crate::Cursor;
 use crate::IndentKind;
-use crate::cursor::MoveTarget;
+use crate::PaneAction;
 use crate::highlighter::BadHighlighterManager;
 
 pub(crate) enum AppState {
@@ -178,7 +179,8 @@ pub struct App {
     pub(crate) current_pane_index: usize,
     pub(crate) info: Option<String>,
     pub(crate) state: AppState,
-    pub(crate) highlighting: BadHighlighterManager
+    pub(crate) action_queue: VecDeque<Action>,
+    pub(crate) highlighting: BadHighlighterManager,
 }
 
 impl App {
@@ -199,6 +201,7 @@ impl App {
             current_pane_index: 0,
             info: None,
             state: AppState::Idle,
+            action_queue: VecDeque::new(),
             highlighting: BadHighlighterManager::new()
         }
     }
@@ -236,87 +239,6 @@ impl App {
             }
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),
-        }
-    }
-}
-
-pub enum Action {
-    None,
-    Quit,
-    Esc,
-    CommandPrompt,
-    SetInfo(String),
-    HandledByPane(PaneAction),
-}
-
-pub enum PaneAction {
-    MoveTo(MoveTarget),
-    SelectTo(MoveTarget),
-    Insert(String),
-    DeleteBackward,
-    DeleteForward,
-    Indent,
-    Dedent
-}
-
-pub fn get_action(ev: &event::Event) -> Action {
-    use event::Event::*;
-    match ev {
-        FocusGained => Action::None,
-        FocusLost => Action::None,
-        Resize(_, _) => Action::None,
-        Mouse(_) => todo!(),
-        Paste(_) => todo!(),
-        Key(
-            kevent @ KeyEvent {
-                code,
-                modifiers,
-                kind: _,
-                state: _,
-            },
-        ) => {
-            let ctrl = modifiers.contains(KeyModifiers::CONTROL);
-            let shift = modifiers.contains(KeyModifiers::SHIFT);
-            let only_shift = (*modifiers - KeyModifiers::SHIFT).is_empty();
-            // TODO: no hard coding, read keybindings from a config file
-            match code {
-                KeyCode::Char('q') if ctrl => Action::Quit,
-                KeyCode::Char('e') if ctrl => Action::CommandPrompt,
-                KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
-                KeyCode::Up =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(1))) },
-                KeyCode::Down =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Down(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(1))) },
-                KeyCode::Left =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Left(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Left(1))) },
-                KeyCode::Right =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Right(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Right(1))) },
-                KeyCode::Home if ctrl =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Start)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Start)) },
-                KeyCode::Home =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::StartOfLine)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::StartOfLine)) },
-                KeyCode::End if ctrl =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::End)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::End)) },
-                KeyCode::End =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::EndOfLine)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::EndOfLine)) },
-                KeyCode::PageUp => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(25))),
-                KeyCode::PageDown => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(25))),
-                KeyCode::Enter => Action::HandledByPane(PaneAction::Insert("\n".into())),
-                KeyCode::Tab => Action::HandledByPane(PaneAction::Indent),
-                KeyCode::BackTab => Action::HandledByPane(PaneAction::Dedent),
-                KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
-                KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
-                KeyCode::Esc => Action::Esc,
-                _ => Action::SetInfo(format!("{kevent:?}")),
-            }
         }
     }
 }

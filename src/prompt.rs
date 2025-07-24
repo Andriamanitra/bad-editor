@@ -8,6 +8,8 @@ use reedline::EditCommand;
 use reedline::KeyCode;
 use reedline::KeyModifiers;
 
+use crate::Action;
+
 /// Quotes strings with spaces, quotes, or control characters in them
 /// Only intended to provide visual clarity, does NOT make the path shell-safe!
 fn quote_path(s: &str) -> String {
@@ -45,6 +47,7 @@ impl crate::bad::App {
         self.state = crate::bad::AppState::InPrompt;
         if let Some((command, arg)) = get_command() {
             match command.as_str() {
+                "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
                 "open" => match self.current_pane_mut().open_file(&arg) {
                     Ok(()) => {},
                     Err(err) => {
