@@ -40,6 +40,7 @@ pub enum Action {
     Quit,
     Esc,
     CommandPrompt,
+    CommandPromptEdit(String),
     SetInfo(String),
     HandledByPane(PaneAction),
 }

@@ -235,7 +235,11 @@ impl App {
             }
             Action::CommandPrompt => {
                 self.info.take();
-                self.command_prompt();
+                self.command_prompt_with(None);
+            }
+            Action::CommandPromptEdit(stub) => {
+                self.info.take();
+                self.command_prompt_with(Some(stub));
             }
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),

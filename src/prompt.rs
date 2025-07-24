@@ -43,9 +43,9 @@ fn quote_path(s: &str) -> String {
 }
 
 impl crate::bad::App {
-    pub fn command_prompt(&mut self) {
+    pub fn command_prompt_with(&mut self, stub: Option<String>) {
         self.state = crate::bad::AppState::InPrompt;
-        if let Some((command, arg)) = get_command() {
+        if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
                 "open" => match self.current_pane_mut().open_file(&arg) {
@@ -66,7 +66,7 @@ impl crate::bad::App {
     }
 }
 
-pub fn get_command() -> Option<(String, String)> {
+pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
     // TODO: add completions, and maybe get rid of Reedline dependency
     // once our own editing capabilities are up to the task?
 
@@ -93,6 +93,9 @@ pub fn get_command() -> Option<(String, String)> {
     let mut ed = Reedline::create()
         .with_edit_mode(Box::new(reedline::Emacs::new(keybindings)))
         .use_kitty_keyboard_enhancement(true);
+    if let Some(stub) = stub {
+        ed.run_edit_commands(&[EditCommand::InsertString(stub)]);
+    }
 
     let prompt = DefaultPrompt {
         left_prompt: DefaultPromptSegment::Empty,
