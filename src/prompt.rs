@@ -79,6 +79,7 @@ pub fn get_command() -> Option<(String, String)> {
     let mut keybindings = reedline::default_emacs_keybindings();
 
     let cancel = ReedlineEvent::Multiple(vec![edits![EditCommand::Clear], ReedlineEvent::Submit]);
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Esc, cancel.clone());
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('e'), cancel.clone());
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('q'), cancel.clone());
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('d'), cancel.clone());
