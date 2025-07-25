@@ -9,6 +9,7 @@ use crossterm::{
 };
 use syntect::highlighting::Style as SyntectStyle;
 use syntect::highlighting::FontStyle as SyntectFontStyle;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::bad::App;
 use crate::ByteOffset;
@@ -132,21 +133,20 @@ impl App {
                     let xtyle = to_crossterm_style(style);
                     // visual_column = None means it's currently unknown
                     let mut visual_column = Some(0);
-                    for (i, c) in s.char_indices() {
+                    for g in s.graphemes(true) {
                         let mut is_cursor = false;
-                        let pos = ByteOffset(byte_offset.0 + i);
-                        while peek!(curs) <= pos {
+                        while peek!(curs) <= byte_offset {
                             match curs.peek() {
                                 Some(Cur::Start(_)) => n_selections += 1,
                                 Some(Cur::End(_)) => n_selections -= 1,
-                                Some(Cur::NoSelection(b)) if b == &pos => {
+                                Some(Cur::NoSelection(b)) if b == &byte_offset => {
                                     is_cursor = true;
                                 }
                                 _ => {}
                             }
                             curs.next();
                         }
-                        if c == '\t' {
+                        if g == "\t" {
                             // '\t' is variable width depending on current column!
                             let tab_width = match visual_column {
                                 Some(n) => tab_width - (n % tab_width),
@@ -170,13 +170,14 @@ impl App {
                                 writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width))))?;
                             }
                             visual_column = visual_column.map(|offset| offset + tab_width);
-                        } else if c == '\n' {
+                        } else if g == "\n" {
                             if n_selections > 0 {
                                 writer.queue(PrintStyledContent(sel_style.with(BLUEISH).apply("⏎")))?;
                             } else if is_cursor {
                                 writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
                             }
-                        } else if c.is_control() {
+                        } else if g.len() == 1 && g.chars().next().is_some_and(|c| c.is_control()) {
+                            let c = g.chars().next().unwrap();
                             let disp = format!("<{:02}>", c as u32);
                             let style =
                                 if n_selections > 0 {
@@ -191,21 +192,22 @@ impl App {
                         } else {
                             let styled =
                                 if n_selections > 0 {
-                                    sel_style.apply(c)
+                                    sel_style.apply(g)
                                 } else if is_cursor {
-                                    xtyle.reverse().apply(c)
+                                    xtyle.reverse().apply(g)
                                 } else {
-                                    xtyle.apply(c)
+                                    xtyle.apply(g)
                                 };
                             writer.queue(PrintStyledContent(styled))?;
-                            if c.is_ascii() {
+                            if g.len() == 1 {
                                 visual_column = visual_column.map(|offset| offset + 1);
                             } else {
                                 visual_column = None;
                             }
                         }
+
+                        byte_offset.0 += g.len();
                     }
-                    byte_offset.0 += s.len();
                     writer.queue(crossterm::style::SetStyle(default_style))?;
                     writer.queue(Clear(ClearType::UntilNewLine))?;
                 }
