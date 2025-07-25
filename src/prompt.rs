@@ -44,6 +44,22 @@ fn quote_path(s: &str) -> String {
     format!("{s:?}")
 }
 
+fn parse_insertchar(s: &str) -> Option<char> {
+    if s.starts_with("U+") {
+        u32::from_str_radix(&s[2..], 16)
+            .ok()
+            .and_then(|codepoint| char::from_u32(codepoint))
+    } else if s.starts_with(|c: char| c.is_ascii_digit()) {
+        s.parse::<u32>()
+            .ok()
+            .and_then(|codepoint| char::from_u32(codepoint))
+    } else if s.eq_ignore_ascii_case("zwj") {
+        Some('\u{200d}')
+    } else {
+        unicode_names2::character(&s)
+    }
+}
+
 impl crate::bad::App {
     pub fn command_prompt_with(&mut self, stub: Option<String>) {
         self.state = crate::bad::AppState::InPrompt;
@@ -51,9 +67,19 @@ impl crate::bad::App {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
                 "insertchar" | "c" => {
-                    match unicode_names2::character(&arg) {
-                        Some(c) => self.enqueue(Action::HandledByPane(PaneAction::Insert(c.to_string()))),
-                        None => self.inform(format!("No character with name {:?}", arg))
+                    let mut out = String::new();
+                    let mut success = true;
+                    for req in arg.split(',') {
+                        if let Some(c) = parse_insertchar(req.trim()) {
+                            out.push(c);
+                        } else {
+                            success = false;
+                            self.inform(format!("No character with name {:?}", req));
+                            break
+                        }
+                    }
+                    if success {
+                        self.enqueue(Action::HandledByPane(PaneAction::Insert(out)))
                     }
                 }
                 "open" => match self.current_pane_mut().open_file(&arg) {
