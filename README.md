@@ -13,17 +13,18 @@ The world obviously needs more [text editors](https://github.com/stars/Andriaman
 
 * Multicursors
 * Mouse support
+* Syntax highlighting for wide variety of languages out of the box
 * Usable for editing LARGE files and LONG lines
 * Familiar keyboard shortcuts (Ctrl-z to undo, Ctrl-c to copy, etc.)
 * Proper handling of Unicode grapheme clusters
-* Syntax highlighting based on existing standard (probably TextMate grammars)
+* Follow established standards where possible (XDG base dirs, editorconfig, sublime-syntax)
 * Support plugins written with [Janet](https://github.com/janet-lang/janet)
 
 ## Non-goals
 
 * Modal editing – I want something more like nano or [micro](https://github.com/zyedidia/micro) and less like vim
 * Split view – I think that is a job for the terminal emulator or a dedicated tool like [tmux](https://github.com/tmux/tmux) or [zellij](https://github.com/zellij-org/zellij)
-* Cross-platform support – I only care about Linux support
+* Cross-platform support – I only care about modern terminals on Linux
 * Customizability – I don't need to customize the layout or colorschemes if the defaults are good
 * Performance – Performance is a secondary concern in a terminal-based text editor
 
