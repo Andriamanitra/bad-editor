@@ -20,7 +20,9 @@ pub struct BadHighlighterManager {
 impl BadHighlighterManager {
     pub fn new() -> Self {
         // TODO: read syntaxes from file, the built-in ones are outdated!
-        let syntax_set = SyntaxSet::load_defaults_newlines();
+        let syntax_set: SyntaxSet = syntect::dumps::from_uncompressed_data(
+            include_bytes!(concat!(env!("OUT_DIR"), "/syntaxes.packdump"))
+        ).expect("syntaxes.packdump should be valid");
 
         macro_rules! theme_scopes {
             ( $( $scope:literal = $fg:literal )* ) => {
