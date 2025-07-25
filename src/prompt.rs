@@ -1,5 +1,6 @@
 use std::io::ErrorKind;
 
+use nu_ansi_term::{Color, Style};
 use reedline::DefaultPrompt;
 use reedline::DefaultPromptSegment;
 use reedline::Reedline;
@@ -7,6 +8,7 @@ use reedline::ReedlineEvent;
 use reedline::EditCommand;
 use reedline::KeyCode;
 use reedline::KeyModifiers;
+use reedline::MenuBuilder;
 use unicode_names2;
 
 use crate::Action;
@@ -65,7 +67,7 @@ impl crate::bad::App {
         self.state = crate::bad::AppState::InPrompt;
         if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
-                "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
+                "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
                 "insertchar" | "c" => {
                     let mut out = String::new();
                     let mut success = true;
@@ -124,9 +126,51 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('v'), edits![EditCommand::Paste]);
     keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Char('a'), edits![EditCommand::SelectAll]);
     keybindings.add_binding(KeyModifiers::ALT, KeyCode::Char('t'), edits![EditCommand::SwapWords]);
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Tab,
+        ReedlineEvent::UntilFound(vec![
+            ReedlineEvent::Menu("completion_menu".into()),
+            ReedlineEvent::MenuNext,
+        ])
+    );
+
+
+    let commands = vec![
+        "exit".into(),
+        "insertchar".into(),
+        "open".into(),
+        "quit".into(),
+    ];
+
+    let completer =
+        reedline::DefaultCompleter::new_with_wordlen(commands, 1);
+
+    let completion_menu =
+        reedline::ReedlineMenu::EngineCompleter(
+            Box::new(reedline::ColumnarMenu::default().with_name("completion_menu"))
+        );
+
+    // TODO: follow XDG spec
+    let history = {
+        let home = std::env::var("HOME").expect("$HOME should always be defined");
+        let hist_path = format!("{home}/.local/state/bad/history");
+        reedline::FileBackedHistory::with_file(100, hist_path.into())
+            .expect("configuring history should be fine")
+    };
+
+    let hinter =
+        reedline::DefaultHinter::default()
+            .with_style(Style::new().fg(Color::Rgb(75, 75, 75)));
 
     let mut ed = Reedline::create()
+        .with_completer(Box::new(completer))
+        .with_partial_completions(true)
+        .with_quick_completions(true)
+        .with_menu(completion_menu)
+        .with_history(Box::new(history))
         .with_edit_mode(Box::new(reedline::Emacs::new(keybindings)))
+        .with_hinter(Box::new(hinter))
         .use_kitty_keyboard_enhancement(true);
     if let Some(stub) = stub {
         ed.run_edit_commands(&[EditCommand::InsertString(stub)]);
