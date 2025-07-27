@@ -5,6 +5,7 @@ mod run;
 mod cursor;
 mod rope_ext;
 mod highlighter;
+mod ropebuffer;
 
 pub use rope_ext::RopeExt;
 pub use cursor::Cursor;

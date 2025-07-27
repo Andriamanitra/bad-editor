@@ -1,7 +1,5 @@
-use std::io::{BufReader, ErrorKind};
+use std::io::{BufReader, ErrorKind, Read};
 use std::collections::VecDeque;
-
-use ropey::Rope;
 
 use crate::Action;
 use crate::ByteOffset;
@@ -9,6 +7,8 @@ use crate::Cursor;
 use crate::IndentKind;
 use crate::PaneAction;
 use crate::highlighter::BadHighlighterManager;
+use crate::ropebuffer::RopeBuffer;
+
 
 pub(crate) enum AppState {
     Idle,
@@ -32,7 +32,7 @@ impl std::default::Default for PaneSettings {
 
 pub struct Pane {
     pub(crate) title: String,
-    pub(crate) content: Rope,
+    pub(crate) content: RopeBuffer,
     pub(crate) viewport_position_row: usize,
     pub(crate) viewport_width: u16,
     pub(crate) viewport_height: u16,
@@ -43,8 +43,13 @@ pub struct Pane {
 impl Pane {
     pub fn open_file(&mut self, path: &str) -> std::io::Result<()> {
         let content = match std::fs::File::open(path) {
-            Ok(file) => Rope::from_reader(BufReader::new(file))?,
-            Err(err) if err.kind() == ErrorKind::NotFound => Rope::new(),
+            Ok(file) => {
+                // TODO: do something more efficient than this
+                let mut s = String::new();
+                BufReader::new(file).read_to_string(&mut s)?;
+                RopeBuffer::from_str(&s)
+            }
+            Err(err) if err.kind() == ErrorKind::NotFound => RopeBuffer::new(),
             Err(err) => return Err(err)
         };
         self.title = path.to_string();
@@ -82,9 +87,8 @@ impl Pane {
     fn indent_lines(&mut self, line_span: std::ops::Range<usize>, indent: IndentKind) {
         let indent = indent.string();
         for lineno in line_span {
-            let bpos = ByteOffset(self.content.line_to_byte(lineno));
-            let cpos = self.content.line_to_char(lineno);
-            self.content.insert(cpos, &indent);
+            let bpos = self.content.line_to_byte(lineno);
+            self.content.insert(bpos, &indent);
             for cursor in self.cursors.iter_mut() {
                 cursor.update_pos_insertion(bpos, indent.len());
             }
@@ -93,25 +97,25 @@ impl Pane {
 
     fn dedent_lines(&mut self, line_span: std::ops::Range<usize>, indent: IndentKind) {
         for lineno in line_span {
-            let bpos = ByteOffset(self.content.line_to_byte(lineno));
-            let cpos = self.content.line_to_char(lineno);
+            let bpos = self.content.line_to_byte(lineno);
             match indent {
                 IndentKind::Spaces(n) => {
                     let n = n as usize;
-                    if self.content.chars_at(cpos).take(n).filter(|&c| c == ' ').count() == n {
-                        self.content.remove(cpos..cpos + n);
-                        let removed = bpos .. ByteOffset(bpos.0 + n);
+                    if bpos.0 + n < self.content.len_bytes()
+                    && (0..n).all(|i| b' ' == self.content.byte(ByteOffset(bpos.0 + i))) {
+                        let indent_range = bpos .. ByteOffset(bpos.0 + n);
+                        self.content.remove(&indent_range);
                         for cursor in self.cursors.iter_mut() {
-                            cursor.update_pos_deletion(&removed);
+                            cursor.update_pos_deletion(&indent_range);
                         }
                     }
                 }
                 IndentKind::Tabs => {
-                    if self.content.char(cpos) == '\t' {
-                        self.content.remove(cpos..cpos+1);
-                        let removed = bpos .. ByteOffset(bpos.0 + 1);
+                    if self.content.byte(bpos) == b'\t' {
+                        let indent_range = bpos .. ByteOffset(bpos.0 + 1);
+                        self.content.remove(&indent_range);
                         for cursor in self.cursors.iter_mut() {
-                            cursor.update_pos_deletion(&removed);
+                            cursor.update_pos_deletion(&indent_range);
                         }
                     }
                 }
@@ -187,7 +191,7 @@ impl App {
     pub fn new() -> Self {
         let pane = Pane {
             title: "bad.txt".to_string(),
-            content: Rope::from("puts 'bad is the bäst text editor'\n\n".repeat(15) + "# ääää"),
+            content: RopeBuffer::new(),
             cursors: vec![Cursor::default()],
             viewport_position_row: 0,
             // these will be set during rendering

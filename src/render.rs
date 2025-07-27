@@ -235,7 +235,7 @@ impl App {
             let status_line_right = format!(
                 "col:{:<3} line:{:<3} {}/{}B",
                 1 + cursor.column(&content),
-                1 + content.byte_to_line(cursor.offset.0),
+                1 + content.byte_to_line(cursor.offset),
                 cursor.offset.0,
                 content.len_bytes()
             );
