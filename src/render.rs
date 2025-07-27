@@ -87,11 +87,16 @@ impl App {
             let mut curs = {
                 let mut curs: Vec<Cur> = vec![];
                 for cursor in self.current_pane().cursors.iter() {
-                    if cursor.has_selection() {
-                        curs.push(Cur::Start(cursor.visual_start_offset()));
-                        curs.push(Cur::End(cursor.visual_end_offset(&content)));
-                    } else {
-                        curs.push(Cur::NoSelection(cursor.offset));
+                    match cursor.selection_from {
+                        Some(sel_from) => {
+                            let a = cursor.offset.min(sel_from);
+                            let b = cursor.offset.max(sel_from);
+                            curs.push(Cur::Start(a));
+                            curs.push(Cur::End(b));
+                        }
+                        None => {
+                            curs.push(Cur::NoSelection(cursor.offset));
+                        }
                     }
                 }
                 curs.sort_unstable_by_key(|c| match c {

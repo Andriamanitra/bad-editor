@@ -216,34 +216,6 @@ impl Cursor {
             content.remove(a..b);
         }
     }
-
-    pub fn previous_grapheme_cluster_len_bytes(&self, content: &Rope) -> usize {
-        match content.previous_boundary_from(self.offset) {
-            Some(boundary) => self.offset.0 - boundary.0,
-            None => 0
-        }
-    }
-
-    pub fn current_grapheme_cluster_len_bytes(&self, content: &Rope) -> usize {
-        match content.next_boundary_from(self.offset) {
-            Some(boundary) => boundary.0 - self.offset.0,
-            None => 0
-        }
-    }
-
-    pub fn visual_start_offset(&self) -> ByteOffset {
-        match self.selection_from {
-            None => self.offset,
-            Some(selection_from) => self.offset.min(selection_from),
-        }
-    }
-
-    pub fn visual_end_offset(&self, content: &Rope) -> ByteOffset {
-        match self.selection_from {
-            None => ByteOffset(self.offset.0 + self.current_grapheme_cluster_len_bytes(content).max(1)),
-            Some(selection_from) => self.offset.max(selection_from),
-        }
-    }
 }
 
 
@@ -380,19 +352,5 @@ mod tests {
         cursor.move_to(&r, MoveTarget::Up(1));
         assert_eq!(r.byte_to_line(cursor.offset.0), 1);
         assert_eq!(cursor.offset, ByteOffset(6));
-    }
-
-    #[test]
-    fn test_grapheme_cluster_len_bytes_on_umlaut() {
-        // "bäst" — 'ä' is at byte offset 1 and is 2 bytes long
-        let rope = Rope::from_str("bäst");
-
-        let cursor = Cursor {
-            offset: ByteOffset(1),
-            selection_from: None,
-        };
-
-        let len = cursor.current_grapheme_cluster_len_bytes(&rope);
-        assert_eq!(len, "ä".len()); // 2 bytes
     }
 }
