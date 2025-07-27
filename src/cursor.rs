@@ -1,8 +1,10 @@
+use std::ops::Range;
+
 use crate::ByteOffset;
 use crate::MoveTarget;
 use crate::ropebuffer::RopeBuffer;
 
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Cursor {
     pub(crate) offset: ByteOffset,
     pub(crate) selection_from: Option<ByteOffset>,
@@ -19,6 +21,14 @@ impl Cursor {
 
     pub fn has_selection(&self) -> bool {
         self.selection_from.is_some()
+    }
+
+    pub fn selection(&self) -> Option<Range<ByteOffset>> {
+        match self.selection_from {
+            Some(sel_from) if sel_from > self.offset => Some(self.offset .. sel_from),
+            Some(sel_from) => Some(sel_from .. self.offset),
+            None => None
+        }
     }
 
     pub fn deselect(&mut self) {
@@ -164,49 +174,6 @@ impl Cursor {
                 let lineno = content.byte_to_line(self.offset);
                 lineno..lineno+1
             }
-        }
-    }
-
-    pub fn insert(&mut self, content: &mut RopeBuffer, s: &str) {
-        if self.has_selection() {
-            self.delete_selection(content);
-        }
-        content.insert(self.offset, &s);
-        self.move_to_byte(ByteOffset(self.offset.0 + s.len()));
-    }
-
-    fn delete_selection(&mut self, content: &mut RopeBuffer) {
-        if let Some(offset) = self.selection_from {
-            let a = self.offset;
-            let b = offset;
-            self.selection_from.take();
-            if a < b {
-                content.remove(&(a..b))
-            } else {
-                self.move_to_byte(offset);
-                content.remove(&(b..a))
-            }
-        }
-    }
-
-    pub fn delete_backward(&mut self, content: &mut RopeBuffer) {
-        if self.has_selection() {
-            self.delete_selection(content);
-        } else {
-            let b = self.offset;
-            self.move_to_byte(self.left(&content, 1));
-            let a = self.offset;
-            content.remove(&(a..b));
-        }
-    }
-
-    pub fn delete_forward(&mut self, content: &mut RopeBuffer) {
-        if self.has_selection() {
-            self.delete_selection(content);
-        } else {
-            let a = self.offset;
-            let b = self.right(content, 1);
-            content.remove(&(a..b));
         }
     }
 }

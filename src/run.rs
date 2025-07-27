@@ -95,6 +95,8 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('q') if ctrl => Action::Quit,
                 KeyCode::Char('e') if ctrl => Action::CommandPrompt,
                 KeyCode::Char('o') if ctrl => Action::CommandPromptEdit("open ".into()),
+                KeyCode::Char('z') if ctrl => Action::HandledByPane(PaneAction::Undo),
+                KeyCode::Char('y') if ctrl => Action::HandledByPane(PaneAction::Redo),
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
                 KeyCode::Up =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }

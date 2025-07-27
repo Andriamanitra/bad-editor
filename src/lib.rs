@@ -54,7 +54,9 @@ pub enum PaneAction {
     DeleteBackward,
     DeleteForward,
     Indent,
-    Dedent
+    Dedent,
+    Undo,
+    Redo,
 }
 
 #[derive(Debug, Clone, Copy)]

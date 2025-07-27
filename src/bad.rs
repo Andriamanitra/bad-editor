@@ -2,7 +2,6 @@ use std::io::{BufReader, ErrorKind, Read};
 use std::collections::VecDeque;
 
 use crate::Action;
-use crate::ByteOffset;
 use crate::Cursor;
 use crate::IndentKind;
 use crate::PaneAction;
@@ -84,45 +83,6 @@ impl Pane {
         }
     }
 
-    fn indent_lines(&mut self, line_span: std::ops::Range<usize>, indent: IndentKind) {
-        let indent = indent.string();
-        for lineno in line_span {
-            let bpos = self.content.line_to_byte(lineno);
-            self.content.insert(bpos, &indent);
-            for cursor in self.cursors.iter_mut() {
-                cursor.update_pos_insertion(bpos, indent.len());
-            }
-        }
-    }
-
-    fn dedent_lines(&mut self, line_span: std::ops::Range<usize>, indent: IndentKind) {
-        for lineno in line_span {
-            let bpos = self.content.line_to_byte(lineno);
-            match indent {
-                IndentKind::Spaces(n) => {
-                    let n = n as usize;
-                    if bpos.0 + n < self.content.len_bytes()
-                    && (0..n).all(|i| b' ' == self.content.byte(ByteOffset(bpos.0 + i))) {
-                        let indent_range = bpos .. ByteOffset(bpos.0 + n);
-                        self.content.remove(&indent_range);
-                        for cursor in self.cursors.iter_mut() {
-                            cursor.update_pos_deletion(&indent_range);
-                        }
-                    }
-                }
-                IndentKind::Tabs => {
-                    if self.content.byte(bpos) == b'\t' {
-                        let indent_range = bpos .. ByteOffset(bpos.0 + 1);
-                        self.content.remove(&indent_range);
-                        for cursor in self.cursors.iter_mut() {
-                            cursor.update_pos_deletion(&indent_range);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /// Called when Esc is pressed, removes selections and extra cursors
     fn esc(&mut self) {
         self.cursors.truncate(1);
@@ -145,35 +105,22 @@ impl Pane {
                 }
             }
             PaneAction::Insert(s) => {
-                self.cursors.sort_by_key(|cur| cur.offset);
-                for cursor in self.cursors.iter_mut().rev() {
-                    cursor.insert(&mut self.content, &s);
-                }
+                self.content.insert_with_cursors(&mut self.cursors, &s);
             }
             PaneAction::DeleteBackward => {
-                self.cursors.sort_by_key(|cur| cur.offset);
-                for cursor in self.cursors.iter_mut().rev() {
-                    cursor.delete_backward(&mut self.content);
-                }
+                self.content.delete_backward_with_cursors(&mut self.cursors);
             }
             PaneAction::DeleteForward => {
-                self.cursors.sort_by_key(|cur| cur.offset);
-                for cursor in self.cursors.iter_mut().rev() {
-                    cursor.delete_forward(&mut self.content);
-                }
+                self.content.delete_forward_with_cursors(&mut self.cursors);
             }
             PaneAction::Indent => {
-                let line_spans: Vec<_> = self.cursors.iter().map(|c| c.line_span(&self.content)).collect();
-                for span in line_spans {
-                    self.indent_lines(span, self.settings.indent_kind);
-                }
+                self.content.indent_with_cursors(&mut self.cursors, self.settings.indent_kind);
             }
             PaneAction::Dedent => {
-                let line_spans: Vec<_> = self.cursors.iter().map(|c| c.line_span(&self.content)).collect();
-                for span in line_spans {
-                    self.dedent_lines(span, self.settings.indent_kind);
-                }
+                self.content.dedent_with_cursors(&mut self.cursors, self.settings.indent_kind);
             }
+            PaneAction::Undo => self.content.undo(&mut self.cursors),
+            PaneAction::Redo => self.content.redo(&mut self.cursors),
         }
     }
 }
