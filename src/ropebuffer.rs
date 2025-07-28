@@ -202,8 +202,8 @@ impl RopeBuffer {
                     edits.push(Edit::Delete(selection));
                 }
                 None => {
-                    let b = cursor.offset;
-                    let a = cursor.right(&self, 1);
+                    let a = cursor.offset;
+                    let b = cursor.right(&self, 1);
                     if a != b {
                         edits.push(Edit::Delete(a..b));
                     }
@@ -431,5 +431,17 @@ mod tests {
         assert_eq!(r.find_next(ByteOffset(1), "abc"), Some(ByteOffset(3)));
         assert_eq!(r.find_next(ByteOffset(3), "abc"), Some(ByteOffset(3)));
         assert_eq!(r.find_next(ByteOffset(4), "abc"), None);
+    }
+
+    #[test]
+    fn delete_at_eof() {
+        let mut r = RopeBuffer::from_str("abc");
+        let mut cursors = MultiCursor::new();
+        let cursor = cursors.primary_mut();
+        cursor.move_to(&r, crate::MoveTarget::Right(2));
+        r.delete_forward_with_cursors(&mut cursors);
+        assert_eq!(r.to_string(), "ab");
+        r.delete_forward_with_cursors(&mut cursors);
+        assert_eq!(r.to_string(), "ab");
     }
 }
