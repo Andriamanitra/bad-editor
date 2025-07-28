@@ -36,7 +36,8 @@ pub struct Pane {
     pub(crate) viewport_width: u16,
     pub(crate) viewport_height: u16,
     pub(crate) cursors: MultiCursor,
-    pub(crate) settings: PaneSettings
+    pub(crate) settings: PaneSettings,
+    pub(crate) last_search: Option<String>,
 }
 
 impl Pane {
@@ -104,6 +105,20 @@ impl Pane {
             }
             PaneAction::Undo => self.cursors = self.content.undo(self.cursors.clone()),
             PaneAction::Redo => self.cursors = self.content.redo(self.cursors.clone()),
+            PaneAction::Find(needle) => {
+                self.content.search_with_cursors(&mut self.cursors, &needle);
+                self.last_search = Some(needle);
+            }
+            PaneAction::RepeatFind => {
+                if let Some(last_search) = self.last_search.as_ref() {
+                    self.content.search_with_cursors(&mut self.cursors, last_search);
+                }
+            }
+            PaneAction::RepeatFindBackward => {
+                if let Some(last_search) = self.last_search.as_ref() {
+                    self.content.search_with_cursors_backward(&mut self.cursors, last_search);
+                }
+            }
         }
     }
 }
@@ -127,7 +142,9 @@ impl App {
             // these will be set during rendering
             viewport_height: 0,
             viewport_width: 0,
+
             settings: PaneSettings::default(),
+            last_search: None,
         };
 
         Self {

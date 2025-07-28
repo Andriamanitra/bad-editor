@@ -24,6 +24,17 @@ impl MultiCursor {
             .expect("primary cursor should always exist")
     }
 
+    pub fn primary_mut<'a>(&'a mut self) -> &'a mut Cursor {
+        self.cursors.get_mut(self.primary_index)
+            .expect("primary cursor should always exist")
+    }
+
+    // TODO: i don't like this API, it's unsafe
+    pub fn set_cursors(&mut self, new_primary: usize, cursors: Vec<Cursor>) {
+        self.cursors = cursors;
+        self.primary_index = new_primary;
+    }
+
     /// Called when Esc is pressed, removes selections and extra cursors
     pub fn esc(&mut self) {
         for cursor in self.iter_mut() {
@@ -59,7 +70,13 @@ impl MultiCursor {
     }
 
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &'a Cursor> {
+        // TODO: make sure cursors are iterated from first to last
         self.cursors.iter()
+    }
+
+    pub fn rev_iter<'a>(&'a self) -> impl Iterator<Item = &'a Cursor> {
+        // TODO: make sure cursors are iterated from last to first
+        self.cursors.iter().rev()
     }
 
     pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut Cursor> {

@@ -68,6 +68,7 @@ impl crate::bad::App {
         if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
+                "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
                 "insertchar" | "c" => {
                     let mut out = String::new();
                     let mut success = true;
@@ -138,6 +139,7 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
 
     let commands = vec![
         "exit".into(),
+        "find".into(),
         "insertchar".into(),
         "open".into(),
         "quit".into(),

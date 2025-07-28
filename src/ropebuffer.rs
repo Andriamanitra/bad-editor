@@ -3,6 +3,7 @@ use std::ops::Range;
 use ropey::Rope;
 use ropey::RopeSlice;
 
+use crate::cursor::Cursor;
 use crate::RopeExt;
 use crate::ByteOffset;
 use crate::MultiCursor;
@@ -286,6 +287,96 @@ impl RopeBuffer {
         }
     }
 
+    pub fn search_with_cursors_backward(&self, cursors: &mut MultiCursor, s: &str) {
+        let mut prev_found: Option<ByteOffset> = None;
+        let mut new_cursors = vec![];
+        for cursor in cursors.rev_iter() {
+            let start = match cursor.selection_from {
+                Some(sel_from) => cursor.offset.max(sel_from),
+                None => cursor.offset,
+            };
+            if prev_found.is_none_or(|p| start < p) {
+                if let Some(offset) = self.find_prev(start, s) {
+                    prev_found.replace(offset);
+                    let match_end = ByteOffset(offset.0 + s.len());
+                    new_cursors.push(Cursor::new_with_selection(offset, Some(match_end)))
+                }
+            }
+            if prev_found.is_none() {
+                return
+            }
+        }
+        let mut new_primary = 0;
+        for (i, cursor) in new_cursors.iter().enumerate() {
+            if cursor.offset > cursors.primary().offset {
+                new_primary = i;
+                break
+            }
+        }
+        cursors.set_cursors(new_primary, new_cursors);
+    }
+
+    pub fn search_with_cursors(&self, cursors: &mut MultiCursor, s: &str) {
+        let mut prev_found: Option<ByteOffset> = None;
+        let mut new_cursors = vec![];
+        for cursor in cursors.iter() {
+            let start = match cursor.selection_from {
+                Some(sel_from) => cursor.offset.max(sel_from),
+                None => cursor.offset,
+            };
+            if prev_found.is_none_or(|p| start > p) {
+                if let Some(offset) = self.find_next(start, s) {
+                    prev_found.replace(offset);
+                    let match_end = ByteOffset(offset.0 + s.len());
+                    new_cursors.push(Cursor::new_with_selection(offset, Some(match_end)))
+                }
+            }
+            if prev_found.is_none() {
+                return
+            }
+        }
+        let mut new_primary = 0;
+        for (i, cursor) in new_cursors.iter().enumerate() {
+            if cursor.offset > cursors.primary().offset {
+                new_primary = i;
+                break
+            }
+        }
+        cursors.set_cursors(new_primary, new_cursors);
+    }
+
+    pub fn find_prev(&self, start: ByteOffset, s: &str) -> Option<ByteOffset> {
+        let c = s.bytes().next()?;
+        let first_possible_start = ByteOffset(start.0.checked_sub(s.len() - 1)?);
+        self.find_byte_positions_backwards_from(first_possible_start, c)
+            .filter(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
+            .next()
+    }
+
+    pub fn find_next(&self, start: ByteOffset, s: &str) -> Option<ByteOffset> {
+        let c = s.bytes().next()?;
+        self.find_byte_positions_from(start, c)
+            .filter(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
+            .next()
+    }
+
+    fn find_byte_positions_backwards_from(&self, from: ByteOffset, c: u8) -> impl Iterator<Item = ByteOffset> {
+        // note that .reversed() is different than .rev():
+        // it iterates backwards from the *CURRENT* position of the iterator
+        self.rope.bytes_at(from.0)
+            .reversed()
+            .enumerate()
+            .filter(move |(_, x)| *x == c)
+            .map(move |(i, _)| ByteOffset(from.0 - i - 1))
+    }
+
+    fn find_byte_positions_from(&self, from: ByteOffset, c: u8) -> impl Iterator<Item = ByteOffset> {
+        self.rope.bytes_at(from.0)
+            .enumerate()
+            .filter(move |(_, x)| *x == c)
+            .map(move |(i, _)| ByteOffset(from.0 + i))
+    }
+
     pub fn next_boundary_from(&self, start: ByteOffset) -> Option<ByteOffset> {
         self.rope.next_boundary_from(start)
     }
@@ -302,5 +393,43 @@ impl RopeBuffer {
 impl ToString for RopeBuffer {
     fn to_string(&self) -> String {
         self.rope.to_string()
+    }
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn find_bytes() {
+        let s = "aaaba".to_string();
+        let r = RopeBuffer::from_str(&s);
+        let positions = r.find_byte_positions_from(ByteOffset(0), b'a')
+            .collect::<Vec<_>>();
+        assert_eq!(positions, vec![ByteOffset(0), ByteOffset(1), ByteOffset(2), ByteOffset(4)]);
+    }
+
+    #[test]
+    fn find_bytes_backwards() {
+        let s = "aaaba".to_string();
+        let r = RopeBuffer::from_str(&s);
+        let positions = r.find_byte_positions_backwards_from(ByteOffset(5), b'a')
+            .collect::<Vec<_>>();
+        assert_eq!(positions, vec![ByteOffset(4), ByteOffset(2), ByteOffset(1), ByteOffset(0)]);
+    }
+
+    #[test]
+    fn search_backwards_from_inside_needle() {
+        let r = RopeBuffer::from_str("abcabc");
+        assert_eq!(r.find_prev(ByteOffset(1), "abc"), None);
+        assert_eq!(r.find_prev(ByteOffset(3), "abc"), Some(ByteOffset(0)));
+        assert_eq!(r.find_prev(ByteOffset(4), "abc"), Some(ByteOffset(0)));
+    }
+
+    #[test]
+    fn search_forwards_from_inside_needle() {
+        let r = RopeBuffer::from_str("abcabc");
+        assert_eq!(r.find_next(ByteOffset(1), "abc"), Some(ByteOffset(3)));
+        assert_eq!(r.find_next(ByteOffset(3), "abc"), Some(ByteOffset(3)));
+        assert_eq!(r.find_next(ByteOffset(4), "abc"), None);
     }
 }

@@ -57,6 +57,9 @@ pub enum PaneAction {
     Dedent,
     Undo,
     Redo,
+    Find(String),
+    RepeatFind,
+    RepeatFindBackward,
 }
 
 #[derive(Debug, Clone, Copy)]
