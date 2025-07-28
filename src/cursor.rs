@@ -71,9 +71,18 @@ impl MultiCursor {
 pub struct Cursor {
     pub(crate) offset: ByteOffset,
     pub(crate) selection_from: Option<ByteOffset>,
+    memorized_column: Option<usize>
 }
 
 impl Cursor {
+    pub fn new_with_offset(offset: ByteOffset) -> Cursor {
+        Self { offset, ..Default::default() }
+    }
+
+    pub fn new_with_selection(offset: ByteOffset, selection_from: Option<ByteOffset>) -> Cursor {
+        Self { offset, selection_from, ..Default::default() }
+    }
+
     pub fn current_line_number(&self, content: &RopeBuffer) -> usize {
         content.byte_to_line(self.offset)
     }
@@ -112,6 +121,17 @@ impl Cursor {
     }
 
     pub fn move_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
+        match target {
+            MoveTarget::Up(_) if self.line_start(content) > ByteOffset(0) => {
+                self.memorized_column.get_or_insert(self.column(content));
+            }
+            MoveTarget::Down(_) if self.line_end(content).0 < content.len_bytes() => {
+                self.memorized_column.get_or_insert(self.column(content));
+            }
+            _ => {
+                self.memorized_column.take();
+            }
+        }
         match self.selection() {
             Some(range) if matches!(target, MoveTarget::Left(1)) => {
                 self.move_to_byte(range.start);
@@ -123,16 +143,17 @@ impl Cursor {
             }
             Some(_) => {
                 self.deselect();
-                self.move_to_byte(self.target_byte_offset(content, target))
+                self.move_to_byte(self.target_byte_offset(content, target));
             }
-            None => self.move_to_byte(self.target_byte_offset(content, target))
+            None => {
+                self.move_to_byte(self.target_byte_offset(content, target));
+            }
         }
     }
 
     pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
         self.select_to_byte(self.target_byte_offset(content, target))
     }
-
 
     fn move_to_byte(&mut self, new_offset: ByteOffset) {
         self.offset = new_offset;
@@ -146,14 +167,24 @@ impl Cursor {
         self.move_to_byte(new_offset);
     }
 
-    // TODO: handle column offset using unicode_segmentation
+    fn to_column(&self, content: &RopeBuffer, column: usize) -> ByteOffset {
+        let mut c = Cursor::new_with_offset(self.line_start(content));
+        let line_end = self.line_end(content);
+        c.move_to(content, MoveTarget::Right(column));
+        line_end.min(c.offset)
+    }
 
     pub fn up(&self, content: &RopeBuffer, n: usize) -> ByteOffset {
         let current_line = self.current_line_number(content);
         if current_line < n {
             ByteOffset(0)
         } else {
-            content.line_to_byte(current_line - n)
+            let line_start = content.line_to_byte(current_line - n);
+            if let Some(preferred_column) = self.memorized_column {
+                Cursor::new_with_offset(line_start).to_column(content, preferred_column)
+            } else {
+                line_start
+            }
         }
     }
 
@@ -162,7 +193,12 @@ impl Cursor {
         if current_line + n > content.len_lines() {
             ByteOffset(content.len_bytes())
         } else {
-            content.line_to_byte(current_line + n)
+            let line_start = content.line_to_byte(current_line + n);
+            if let Some(preferred_column) = self.memorized_column {
+                Cursor::new_with_offset(line_start).to_column(content, preferred_column)
+            } else {
+                line_start
+            }
         }
     }
 
@@ -264,6 +300,12 @@ mod tests {
     const THUMBS_UP_WITH_MODIFIER: &'static str = "\u{1f44d}\u{1f3fb}";
     const FAMILY: &'static str = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f466}";
 
+    pub fn cursor(offset: usize, selection_from: Option<usize>) -> Cursor {
+        let offset = ByteOffset(offset);
+        let selection_from = selection_from.map(|n| ByteOffset(n));
+        Cursor { offset, selection_from, ..Default::default() }
+    }
+
     #[test]
     fn move_right() {
         let s = format!("a{SIMPLE_EMOJI}ä{THUMBS_UP_WITH_MODIFIER}b{FAMILY}");
@@ -291,7 +333,7 @@ mod tests {
     fn move_left() {
         let s = format!("a{SIMPLE_EMOJI}ä{THUMBS_UP_WITH_MODIFIER}b{FAMILY}x");
         let r = RopeBuffer::from_str(&s);
-        let mut cursor = Cursor { offset: ByteOffset(r.len_bytes()), selection_from: None };
+        let mut cursor = Cursor::new_with_offset(ByteOffset(r.len_bytes()));
 
         let expected_offsets = vec![
             0,
@@ -313,7 +355,7 @@ mod tests {
     #[test]
     fn move_home_end() {
         let r = RopeBuffer::from_str("abc\ndef");
-        let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
+        let mut cursor = Cursor::new_with_offset(ByteOffset(1));
         cursor.move_to(&r, MoveTarget::EndOfLine);
         assert_eq!(cursor.offset, ByteOffset(3));
         cursor.move_to(&r, MoveTarget::StartOfLine);
@@ -323,7 +365,7 @@ mod tests {
     #[test]
     fn move_home_end_last_line() {
         let r = RopeBuffer::from_str("abc\ndef");
-        let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
+        let mut cursor = Cursor::new_with_offset(ByteOffset(5));
         cursor.move_to(&r, MoveTarget::StartOfLine);
         assert_eq!(cursor.offset, ByteOffset(4));
         cursor.move_to(&r, MoveTarget::EndOfLine);
@@ -331,13 +373,34 @@ mod tests {
     }
 
     #[test]
+    fn forget_preferred_column_up_on_first_line() {
+        let r = RopeBuffer::from_str("abc\ndef");
+        let mut cursor = Cursor::new_with_offset(ByteOffset(6));
+        cursor.move_to(&r, MoveTarget::Up(1));
+        assert_eq!(cursor.memorized_column, Some(2));
+        cursor.move_to(&r, MoveTarget::Up(1));
+        assert_eq!(cursor.memorized_column, None);
+    }
+
+    #[test]
+    fn forget_preferred_column_down_on_last_line() {
+        let r = RopeBuffer::from_str("abc\ndef");
+        let mut cursor = Cursor::new_with_offset(ByteOffset(2));
+        cursor.move_to(&r, MoveTarget::Down(1));
+        assert_eq!(cursor.memorized_column, Some(2));
+        cursor.move_to(&r, MoveTarget::Down(1));
+        assert_eq!(cursor.memorized_column, None);
+    }
+
+    #[test]
     fn move_up_down() {
         let r = RopeBuffer::from_str("abc\ndef\n\nghi");
-        let mut cursor = Cursor { offset: ByteOffset(2), selection_from: None };
+        let mut cursor = Cursor::new_with_offset(ByteOffset(2));
 
         // cursor should move to between e|f
         cursor.move_to(&r, MoveTarget::Down(1));
         assert_eq!(r.byte_to_line(cursor.offset), 1);
+        assert_eq!(cursor.memorized_column, Some(2));
         assert_eq!(cursor.offset, ByteOffset(6));
 
         // cursor should move to the empty line between f and g
@@ -361,12 +424,26 @@ mod tests {
         cursor.move_to(&r, MoveTarget::Up(1));
         assert_eq!(r.byte_to_line(cursor.offset), 1);
         assert_eq!(cursor.offset, ByteOffset(6));
+
+        // up to between b|c
+        cursor.move_to(&r, MoveTarget::Up(1));
+        assert_eq!(r.byte_to_line(cursor.offset), 0);
+        assert_eq!(cursor.offset, ByteOffset(2));
+
+        // up to start of text (reset memorized column)
+        cursor.move_to(&r, MoveTarget::Up(1));
+        assert_eq!(cursor.offset, ByteOffset(0));
+        assert_eq!(cursor.memorized_column, None, "cursor should forget memorized column");
+
+        // down to before 'd'
+        cursor.move_to(&r, MoveTarget::Down(1));
+        assert_eq!(cursor.offset, ByteOffset(4));
     }
 
     #[rstest]
-    #[case(Cursor { offset: ByteOffset(1), selection_from: Some(ByteOffset(5)) }, ByteOffset(1))]
-    #[case(Cursor { offset: ByteOffset(4), selection_from: Some(ByteOffset(1)) }, ByteOffset(1))]
-    #[case(Cursor { offset: ByteOffset(6), selection_from: Some(ByteOffset(7)) }, ByteOffset(6))]
+    #[case(cursor(1, Some(5)), ByteOffset(1))]
+    #[case(cursor(4, Some(1)), ByteOffset(1))]
+    #[case(cursor(6, Some(7)), ByteOffset(6))]
     fn move_1_left_with_selection(
         #[case] mut cursor: Cursor,
         #[case] offset_after_move: ByteOffset,
@@ -378,9 +455,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case(Cursor { offset: ByteOffset(1), selection_from: Some(ByteOffset(5)) }, ByteOffset(5))]
-    #[case(Cursor { offset: ByteOffset(4), selection_from: Some(ByteOffset(1)) }, ByteOffset(4))]
-    #[case(Cursor { offset: ByteOffset(5), selection_from: Some(ByteOffset(6)) }, ByteOffset(6))]
+    #[case(cursor(1, Some(5)), ByteOffset(5))]
+    #[case(cursor(4, Some(1)), ByteOffset(4))]
+    #[case(cursor(5, Some(6)), ByteOffset(6))]
     fn move_1_right_with_selection(
         #[case] mut cursor: Cursor,
         #[case] offset_after_move: ByteOffset,
@@ -401,19 +478,19 @@ mod tests {
         #[case] offset_after_move: ByteOffset,
     ) {
         let r = RopeBuffer::from_str("0\n234\n67\n9");
-        let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
+        let mut cursor = Cursor::new_with_offset(ByteOffset(5));
         cursor.move_to(&r, target);
         assert_eq!(cursor.offset, offset_after_move);
     }
 
     #[rstest]
-    #[case(Cursor { offset: ByteOffset(0), selection_from: None }, 0..1)]
-    #[case(Cursor { offset: ByteOffset(1), selection_from: None }, 0..1)]
-    #[case(Cursor { offset: ByteOffset(2), selection_from: None }, 1..2)]
-    #[case(Cursor { offset: ByteOffset(0), selection_from: Some(ByteOffset(10)) }, 0..4)]
-    #[case(Cursor { offset: ByteOffset(10), selection_from: Some(ByteOffset(0)) }, 0..4)]
-    #[case(Cursor { offset: ByteOffset(5), selection_from: Some(ByteOffset(6)) }, 1..3)]
-    #[case(Cursor { offset: ByteOffset(6), selection_from: Some(ByteOffset(5)) }, 1..3)]
+    #[case(cursor(0, None), 0..1)]
+    #[case(cursor(1, None), 0..1)]
+    #[case(cursor(2, None), 1..2)]
+    #[case(cursor(0, Some(10)), 0..4)]
+    #[case(cursor(10, Some(0)), 0..4)]
+    #[case(cursor(5, Some(6)), 1..3)]
+    #[case(cursor(6, Some(5)), 1..3)]
     fn cursor_line_span(
         #[case] cursor: Cursor,
         #[case] expected_line_span: Range<usize>
