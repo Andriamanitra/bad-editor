@@ -100,6 +100,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('f') if ctrl => Action::CommandPromptEdit("find ".into()),
                 KeyCode::Char('b') if ctrl => Action::HandledByPane(PaneAction::RepeatFindBackward),
                 KeyCode::Char('n') if ctrl => Action::HandledByPane(PaneAction::RepeatFind),
+                KeyCode::Char('d') if ctrl => Action::HandledByPane(PaneAction::QuickAddNext),
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
                 KeyCode::Up =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }

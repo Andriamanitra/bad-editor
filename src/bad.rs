@@ -2,6 +2,8 @@ use std::io::{BufReader, ErrorKind, Read};
 use std::collections::VecDeque;
 
 use crate::Action;
+use crate::cursor::Cursor;
+use crate::ByteOffset;
 use crate::MultiCursor;
 use crate::IndentKind;
 use crate::PaneAction;
@@ -117,6 +119,18 @@ impl Pane {
             PaneAction::RepeatFindBackward => {
                 if let Some(last_search) = self.last_search.as_ref() {
                     self.content.search_with_cursors_backward(&mut self.cursors, last_search);
+                }
+            }
+            PaneAction::QuickAddNext => {
+                if let Some(selection) = self.cursors.primary().selection() {
+                    let selection_str = self.content.slice(&selection).to_string();
+                    if let Some(offset) = self.content.find_next_cycle(selection.end, &selection_str) {
+                        if offset != selection.start {
+                            let sel_end = ByteOffset(offset.0 + selection.end.0 - selection.start.0);
+                            let new_cursor = Cursor::new_with_selection(offset, Some(sel_end));
+                            self.cursors.spawn_new_primary(new_cursor);
+                        }
+                    }
                 }
             }
         }

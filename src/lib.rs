@@ -60,6 +60,7 @@ pub enum PaneAction {
     Find(String),
     RepeatFind,
     RepeatFindBackward,
+    QuickAddNext,
 }
 
 #[derive(Debug, Clone, Copy)]

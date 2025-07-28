@@ -29,6 +29,11 @@ impl MultiCursor {
             .expect("primary cursor should always exist")
     }
 
+    pub fn spawn_new_primary(&mut self, new: Cursor) {
+        self.cursors.push(new);
+        self.primary_index = self.cursors.len() - 1;
+    }
+
     // TODO: i don't like this API, it's unsafe
     pub fn set_cursors(&mut self, new_primary: usize, cursors: Vec<Cursor>) {
         self.cursors = cursors;

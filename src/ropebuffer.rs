@@ -118,7 +118,7 @@ impl RopeBuffer {
         self.rope.remove(a..b);
     }
 
-    fn slice(&self, range: &Range<ByteOffset>) -> RopeSlice<'_> {
+    pub fn slice(&self, range: &Range<ByteOffset>) -> RopeSlice<'_> {
         self.rope.byte_slice(range.start.0 .. range.end.0)
     }
 
@@ -358,6 +358,10 @@ impl RopeBuffer {
         self.find_byte_positions_from(start, c)
             .filter(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
             .next()
+    }
+
+    pub fn find_next_cycle(&self, start: ByteOffset, s: &str) -> Option<ByteOffset> {
+        self.find_next(start, s).or_else(|| self.find_next(ByteOffset(0), s))
     }
 
     fn find_byte_positions_backwards_from(&self, from: ByteOffset, c: u8) -> impl Iterator<Item = ByteOffset> {
