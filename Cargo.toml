@@ -15,5 +15,8 @@ syntect = "5.2.0"
 unicode-segmentation = "1.12.0"
 unicode_names2 = "2.0.0"
 
+[dev-dependencies]
+rstest = "0.26.1"
+
 [build-dependencies]
 syntect = "5.2.0"

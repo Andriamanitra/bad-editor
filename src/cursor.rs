@@ -234,7 +234,7 @@ impl Cursor {
         }
     }
 
-    pub fn line_span(&self, content: &RopeBuffer) -> std::ops::Range<usize> {
+    pub fn line_span(&self, content: &RopeBuffer) -> Range<usize> {
         match self.selection_from {
             Some(sel) if sel < self.offset => {
                 let lineno_start = content.byte_to_line(sel);
@@ -258,12 +258,14 @@ impl Cursor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
+
     const SIMPLE_EMOJI: &'static str = "\u{1f60a}";
     const THUMBS_UP_WITH_MODIFIER: &'static str = "\u{1f44d}\u{1f3fb}";
     const FAMILY: &'static str = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f466}";
 
     #[test]
-    fn test_move_right() {
+    fn move_right() {
         let s = format!("a{SIMPLE_EMOJI}ä{THUMBS_UP_WITH_MODIFIER}b{FAMILY}");
         let r = RopeBuffer::from_str(&s);
         let mut cursor = Cursor::default();
@@ -286,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_left() {
+    fn move_left() {
         let s = format!("a{SIMPLE_EMOJI}ä{THUMBS_UP_WITH_MODIFIER}b{FAMILY}x");
         let r = RopeBuffer::from_str(&s);
         let mut cursor = Cursor { offset: ByteOffset(r.len_bytes()), selection_from: None };
@@ -304,12 +306,12 @@ mod tests {
 
         for &expected in expected_offsets.iter().rev() {
             cursor.move_to(&r, MoveTarget::Left(1));
-            assert_eq!(cursor.offset.0, expected, "{}", r.len_bytes());
+            assert_eq!(cursor.offset.0, expected);
         }
     }
 
     #[test]
-    fn test_move_home_end() {
+    fn move_home_end() {
         let r = RopeBuffer::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
         cursor.move_to(&r, MoveTarget::EndOfLine);
@@ -319,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_home_end_last_line() {
+    fn move_home_end_last_line() {
         let r = RopeBuffer::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
         cursor.move_to(&r, MoveTarget::StartOfLine);
@@ -329,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_up_down() {
+    fn move_up_down() {
         let r = RopeBuffer::from_str("abc\ndef\n\nghi");
         let mut cursor = Cursor { offset: ByteOffset(2), selection_from: None };
 
@@ -359,5 +361,77 @@ mod tests {
         cursor.move_to(&r, MoveTarget::Up(1));
         assert_eq!(r.byte_to_line(cursor.offset), 1);
         assert_eq!(cursor.offset, ByteOffset(6));
+    }
+
+    #[rstest]
+    #[case(Cursor { offset: ByteOffset(1), selection_from: Some(ByteOffset(5)) }, ByteOffset(1))]
+    #[case(Cursor { offset: ByteOffset(4), selection_from: Some(ByteOffset(1)) }, ByteOffset(1))]
+    #[case(Cursor { offset: ByteOffset(6), selection_from: Some(ByteOffset(7)) }, ByteOffset(6))]
+    fn move_1_left_with_selection(
+        #[case] mut cursor: Cursor,
+        #[case] offset_after_move: ByteOffset,
+    ) {
+        let r = RopeBuffer::from_str("abcde\nfghij");
+        cursor.move_to(&r, MoveTarget::Left(1));
+        assert_eq!(cursor.offset, offset_after_move);
+        assert!(!cursor.has_selection());
+    }
+
+    #[rstest]
+    #[case(Cursor { offset: ByteOffset(1), selection_from: Some(ByteOffset(5)) }, ByteOffset(5))]
+    #[case(Cursor { offset: ByteOffset(4), selection_from: Some(ByteOffset(1)) }, ByteOffset(4))]
+    #[case(Cursor { offset: ByteOffset(5), selection_from: Some(ByteOffset(6)) }, ByteOffset(6))]
+    fn move_1_right_with_selection(
+        #[case] mut cursor: Cursor,
+        #[case] offset_after_move: ByteOffset,
+    ) {
+        let r = RopeBuffer::from_str("abcde\nfghij");
+        cursor.move_to(&r, MoveTarget::Right(1));
+        assert_eq!(cursor.offset, offset_after_move);
+        assert!(!cursor.has_selection());
+    }
+
+    #[rstest]
+    #[case(MoveTarget::Left(100), ByteOffset(0))]
+    #[case(MoveTarget::Up(100), ByteOffset(0))]
+    #[case(MoveTarget::Right(100), ByteOffset(10))]
+    #[case(MoveTarget::Down(100), ByteOffset(10))]
+    fn move_out_of_bounds(
+        #[case] target: MoveTarget,
+        #[case] offset_after_move: ByteOffset,
+    ) {
+        let r = RopeBuffer::from_str("0\n234\n67\n9");
+        let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
+        cursor.move_to(&r, target);
+        assert_eq!(cursor.offset, offset_after_move);
+    }
+
+    #[rstest]
+    #[case(Cursor { offset: ByteOffset(0), selection_from: None }, 0..1)]
+    #[case(Cursor { offset: ByteOffset(1), selection_from: None }, 0..1)]
+    #[case(Cursor { offset: ByteOffset(2), selection_from: None }, 1..2)]
+    #[case(Cursor { offset: ByteOffset(0), selection_from: Some(ByteOffset(10)) }, 0..4)]
+    #[case(Cursor { offset: ByteOffset(10), selection_from: Some(ByteOffset(0)) }, 0..4)]
+    #[case(Cursor { offset: ByteOffset(5), selection_from: Some(ByteOffset(6)) }, 1..3)]
+    #[case(Cursor { offset: ByteOffset(6), selection_from: Some(ByteOffset(5)) }, 1..3)]
+    fn cursor_line_span(
+        #[case] cursor: Cursor,
+        #[case] expected_line_span: Range<usize>
+    ) {
+        let r = RopeBuffer::from_str("0\n234\n67\n9");
+        assert_eq!(cursor.line_span(&r), expected_line_span);
+    }
+
+    #[rstest]
+    #[case("ab", ByteOffset(2))]
+    #[case("abc\nxyz\n", ByteOffset(3))]
+    #[case("abcd\r\nxyz\n", ByteOffset(4))]
+    fn line_end(
+        #[case] s: &'static str,
+        #[case] expected: ByteOffset
+    ) {
+        let r = RopeBuffer::from_str(s);
+        let cursor = Cursor::default();
+        assert_eq!(cursor.line_end(&r), expected, "expected {expected:?} for {s:?}");
     }
 }
