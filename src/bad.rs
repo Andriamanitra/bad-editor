@@ -2,7 +2,7 @@ use std::io::{BufReader, ErrorKind, Read};
 use std::collections::VecDeque;
 
 use crate::Action;
-use crate::Cursor;
+use crate::MultiCursor;
 use crate::IndentKind;
 use crate::PaneAction;
 use crate::highlighter::BadHighlighterManager;
@@ -35,7 +35,7 @@ pub struct Pane {
     pub(crate) viewport_position_row: usize,
     pub(crate) viewport_width: u16,
     pub(crate) viewport_height: u16,
-    pub(crate) cursors: Vec<Cursor>,
+    pub(crate) cursors: MultiCursor,
     pub(crate) settings: PaneSettings
 }
 
@@ -53,7 +53,7 @@ impl Pane {
         };
         self.title = path.to_string();
         self.content = content;
-        self.cursors = vec![Cursor::default()];
+        self.cursors = MultiCursor::new();
         Ok(())
     }
 
@@ -63,11 +63,7 @@ impl Pane {
     }
 
     pub fn adjust_viewport(&mut self) {
-        // assume the first cursor is the primary one for now
-        let mut line_number = 0;
-        for cursor in self.cursors.iter().take(1) {
-            line_number = cursor.current_line_number(&self.content);
-        }
+        let line_number = self.cursors.primary().current_line_number(&self.content);
         self.adjust_viewport_to_show_line(line_number);
     }
 
@@ -83,26 +79,13 @@ impl Pane {
         }
     }
 
-    /// Called when Esc is pressed, removes selections and extra cursors
-    fn esc(&mut self) {
-        self.cursors.truncate(1);
-        for cursor in self.cursors.iter_mut() {
-            cursor.deselect();
-        }
-    }
-
     fn handle_event(&mut self, event: PaneAction) {
         match event {
             PaneAction::MoveTo(target) => {
-                for cursor in self.cursors.iter_mut() {
-                    cursor.deselect();
-                    cursor.move_to(&self.content, target);
-                }
+                self.cursors.move_to(&self.content, target);
             }
             PaneAction::SelectTo(target) => {
-                for cursor in self.cursors.iter_mut() {
-                    cursor.select_to(&self.content, target);
-                }
+                self.cursors.select_to(&self.content, target);
             }
             PaneAction::Insert(s) => {
                 self.content.insert_with_cursors(&mut self.cursors, &s);
@@ -119,8 +102,8 @@ impl Pane {
             PaneAction::Dedent => {
                 self.content.dedent_with_cursors(&mut self.cursors, self.settings.indent_kind);
             }
-            PaneAction::Undo => self.content.undo(&mut self.cursors),
-            PaneAction::Redo => self.content.redo(&mut self.cursors),
+            PaneAction::Undo => self.cursors = self.content.undo(self.cursors.clone()),
+            PaneAction::Redo => self.cursors = self.content.redo(self.cursors.clone()),
         }
     }
 }
@@ -139,7 +122,7 @@ impl App {
         let pane = Pane {
             title: "bad.txt".to_string(),
             content: RopeBuffer::new(),
-            cursors: vec![Cursor::default()],
+            cursors: MultiCursor::new(),
             viewport_position_row: 0,
             // these will be set during rendering
             viewport_height: 0,
@@ -181,7 +164,7 @@ impl App {
             Action::None => (),
             Action::Quit => (),
             Action::Esc => {
-                self.current_pane_mut().esc();
+                self.current_pane_mut().cursors.esc();
                 self.info.take();
             }
             Action::CommandPrompt => {

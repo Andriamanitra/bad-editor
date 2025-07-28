@@ -8,7 +8,7 @@ mod highlighter;
 mod ropebuffer;
 
 pub use rope_ext::RopeExt;
-pub use cursor::Cursor;
+pub use cursor::MultiCursor;
 
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct ByteOffset(pub usize);

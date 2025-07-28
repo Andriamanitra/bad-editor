@@ -231,7 +231,7 @@ impl App {
             let width = wsize.columns as usize;
             let status_line_title = format!("{:width$}", self.current_pane().title, width = width);
             writer.queue(PrintStyledContent(default_style.negative().apply(status_line_title)))?;
-            let cursor = &self.current_pane().cursors[0];
+            let cursor = self.current_pane().cursors.primary();
             let status_line_right = format!(
                 "col:{:<3} line:{:<3} {}/{}B",
                 1 + cursor.column(&content),

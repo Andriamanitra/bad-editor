@@ -4,6 +4,69 @@ use crate::ByteOffset;
 use crate::MoveTarget;
 use crate::ropebuffer::RopeBuffer;
 
+#[derive(Debug, Clone)]
+pub struct MultiCursor {
+    cursors: Vec<Cursor>,
+    primary_index: usize,
+}
+
+impl MultiCursor {
+    pub fn new() -> Self {
+        Self {
+            cursors: vec![Cursor::default()],
+            primary_index: 0,
+        }
+    }
+
+    /// Returns an immutable reference to the primary cursor
+    pub fn primary<'a>(&'a self) -> &'a Cursor {
+        self.cursors.get(self.primary_index)
+            .expect("primary cursor should always exist")
+    }
+
+    /// Called when Esc is pressed, removes selections and extra cursors
+    pub fn esc(&mut self) {
+        for cursor in self.iter_mut() {
+            cursor.deselect();
+        }
+        self.cursors[0] = self.cursors[self.primary_index];
+        self.primary_index = 0;
+        self.cursors.truncate(1);
+    }
+
+    pub fn move_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
+        for cursor in self.iter_mut() {
+            cursor.move_to(content, target);
+        }
+    }
+
+    pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
+        for cursor in self.iter_mut() {
+            cursor.select_to(&content, target);
+        }
+    }
+
+    pub fn update_positions_insertion(&mut self, offset: ByteOffset, length: usize) {
+        for cursor in self.iter_mut() {
+            cursor.update_pos_insertion(offset, length);
+        }
+    }
+
+    pub fn update_positions_deletion(&mut self, range: &Range<ByteOffset>) {
+        for cursor in self.iter_mut() {
+            cursor.update_pos_deletion(range);
+        }
+    }
+
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &'a Cursor> {
+        self.cursors.iter()
+    }
+
+    pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut Cursor> {
+        self.cursors.iter_mut()
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Cursor {
     pub(crate) offset: ByteOffset,
