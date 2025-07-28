@@ -49,8 +49,21 @@ impl Cursor {
     }
 
     pub fn move_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
-        self.deselect();
-        self.move_to_byte(self.target_byte_offset(content, target))
+        match self.selection() {
+            Some(range) if matches!(target, MoveTarget::Left(1)) => {
+                self.move_to_byte(range.start);
+                self.deselect();
+            }
+            Some(range) if matches!(target, MoveTarget::Right(1)) => {
+                self.move_to_byte(range.end);
+                self.deselect();
+            }
+            Some(_) => {
+                self.deselect();
+                self.move_to_byte(self.target_byte_offset(content, target))
+            }
+            None => self.move_to_byte(self.target_byte_offset(content, target))
+        }
     }
 
     pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
