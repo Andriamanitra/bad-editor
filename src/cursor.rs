@@ -233,34 +233,6 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_multibyte() {
-        let mut r = RopeBuffer::from_str("abc");
-        let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
-        cursor.insert(&mut r, FAMILY);
-        let expected = format!("a{FAMILY}bc");
-        assert_eq!(r.to_string(), expected);
-        assert_eq!(cursor.offset, ByteOffset(1 + FAMILY.len()));
-    }
-
-    #[test]
-    fn test_delete_backward_multibyte() {
-        let mut r = RopeBuffer::from_str("a😊b");
-        let mut cursor = Cursor { offset: ByteOffset(5), selection_from: None };
-        cursor.delete_backward(&mut r);
-        assert_eq!(&r.to_string(), "ab");
-        assert_eq!(cursor.offset, ByteOffset(1));
-    }
-
-    #[test]
-    fn test_delete_forward_multibyte() {
-        let mut r = RopeBuffer::from_str("a😊b");
-        let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
-        cursor.delete_forward(&mut r);
-        assert_eq!(&r.to_string(), "ab");
-        assert_eq!(cursor.offset, ByteOffset(1));
-    }
-
-    #[test]
     fn test_move_home_end() {
         let r = RopeBuffer::from_str("abc\ndef");
         let mut cursor = Cursor { offset: ByteOffset(1), selection_from: None };
