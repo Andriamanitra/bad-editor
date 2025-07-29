@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::Range;
 
 use ropey::Rope;
@@ -47,7 +48,7 @@ impl Edit {
 
 impl PartialOrd for Edit {
     fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
-        self.pos().partial_cmp(&rhs.pos())
+        Some(self.cmp(rhs))
     }
 }
 
@@ -126,7 +127,7 @@ impl RopeBuffer {
         for edit in edits.iter().rev() {
             match edit {
                 Edit::Insert(offset, s) => self.insert_rope(*offset, s.clone()),
-                Edit::Delete(range) => self.remove(&range),
+                Edit::Delete(range) => self.remove(range),
             }
         }
     }
@@ -180,7 +181,7 @@ impl RopeBuffer {
                 },
                 None => {
                     let b = cursor.offset;
-                    let a = cursor.left(&self, 1);
+                    let a = cursor.left(self, 1);
                     if a != b {
                         edits.push(Edit::Delete(a..b));
                     }
@@ -203,7 +204,7 @@ impl RopeBuffer {
                 }
                 None => {
                     let a = cursor.offset;
-                    let b = cursor.right(&self, 1);
+                    let b = cursor.right(self, 1);
                     if a != b {
                         edits.push(Edit::Delete(a..b));
                     }
@@ -220,7 +221,7 @@ impl RopeBuffer {
         let mut edits = vec![];
 
         for cursor in cursors.iter() {
-            for lineno in cursor.line_span(&self) {
+            for lineno in cursor.line_span(self) {
                 let bpos = self.line_to_byte(lineno);
                 edits.push(Edit::insert_str(bpos, &indent));
             }
@@ -235,7 +236,7 @@ impl RopeBuffer {
         let mut edits = vec![];
 
         for cursor in cursors.iter() {
-            for lineno in cursor.line_span(&self) {
+            for lineno in cursor.line_span(self) {
                 let bpos = self.line_to_byte(lineno);
                 match indent {
                     IndentKind::Spaces(n) => {
@@ -349,15 +350,13 @@ impl RopeBuffer {
         let c = s.bytes().next()?;
         let first_possible_start = ByteOffset(start.0.checked_sub(s.len() - 1)?);
         self.find_byte_positions_backwards_from(first_possible_start, c)
-            .filter(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
-            .next()
+            .find(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
     }
 
     pub fn find_next(&self, start: ByteOffset, s: &str) -> Option<ByteOffset> {
         let c = s.bytes().next()?;
         self.find_byte_positions_from(start, c)
-            .filter(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
-            .next()
+            .find(|pos| s.bytes().eq(self.rope.bytes_at(pos.0).take(s.len())))
     }
 
     pub fn find_next_cycle(&self, start: ByteOffset, s: &str) -> Option<ByteOffset> {
@@ -394,9 +393,9 @@ impl RopeBuffer {
     }
 }
 
-impl ToString for RopeBuffer {
-    fn to_string(&self) -> String {
-        self.rope.to_string()
+impl Display for RopeBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.rope.to_string())
     }
 }
 

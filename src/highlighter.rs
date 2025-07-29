@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use syntect;
 use syntect::easy::HighlightLines;
 use syntect::parsing::SyntaxSet;
 //use syntect::parsing::SyntaxSetBuilder;
@@ -87,8 +86,8 @@ pub struct BadHighlighter<'a> {
     highlighter: HighlightLines<'a>,
 }
 
-impl<'a> BadHighlighter<'a> {
+impl BadHighlighter<'_> {
     pub fn highlight<'t>(&mut self, text: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
-        self.highlighter.highlight_line(text, &self.ss).unwrap().into_iter()
+        self.highlighter.highlight_line(text, self.ss).unwrap().into_iter()
     }
 }

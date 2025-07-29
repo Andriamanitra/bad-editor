@@ -19,12 +19,12 @@ impl MultiCursor {
     }
 
     /// Returns an immutable reference to the primary cursor
-    pub fn primary<'a>(&'a self) -> &'a Cursor {
+    pub fn primary(&self) -> &Cursor {
         self.cursors.get(self.primary_index)
             .expect("primary cursor should always exist")
     }
 
-    pub fn primary_mut<'a>(&'a mut self) -> &'a mut Cursor {
+    pub fn primary_mut(&mut self) -> &mut Cursor {
         self.cursors.get_mut(self.primary_index)
             .expect("primary cursor should always exist")
     }
@@ -58,7 +58,7 @@ impl MultiCursor {
 
     pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
         for cursor in self.iter_mut() {
-            cursor.select_to(&content, target);
+            cursor.select_to(content, target);
         }
     }
 
@@ -74,18 +74,24 @@ impl MultiCursor {
         }
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &'a Cursor> {
+    pub fn iter(&self) -> impl Iterator<Item = &Cursor> {
         // TODO: make sure cursors are iterated from first to last
         self.cursors.iter()
     }
 
-    pub fn rev_iter<'a>(&'a self) -> impl Iterator<Item = &'a Cursor> {
+    pub fn rev_iter(&self) -> impl Iterator<Item = &Cursor> {
         // TODO: make sure cursors are iterated from last to first
         self.cursors.iter().rev()
     }
 
-    pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut Cursor> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cursor> {
         self.cursors.iter_mut()
+    }
+}
+
+impl Default for MultiCursor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -189,7 +195,7 @@ impl Cursor {
         self.move_to_byte(new_offset);
     }
 
-    fn to_column(&self, content: &RopeBuffer, column: usize) -> ByteOffset {
+    fn offset_at_column(&self, content: &RopeBuffer, column: usize) -> ByteOffset {
         let mut c = Cursor::new_with_offset(self.line_start(content));
         let line_end = self.line_end(content);
         c.move_to(content, MoveTarget::Right(column));
@@ -203,7 +209,7 @@ impl Cursor {
         } else {
             let line_start = content.line_to_byte(current_line - n);
             if let Some(preferred_column) = self.memorized_column {
-                Cursor::new_with_offset(line_start).to_column(content, preferred_column)
+                Cursor::new_with_offset(line_start).offset_at_column(content, preferred_column)
             } else {
                 line_start
             }
@@ -217,7 +223,7 @@ impl Cursor {
         } else {
             let line_start = content.line_to_byte(current_line + n);
             if let Some(preferred_column) = self.memorized_column {
-                Cursor::new_with_offset(line_start).to_column(content, preferred_column)
+                Cursor::new_with_offset(line_start).offset_at_column(content, preferred_column)
             } else {
                 line_start
             }
@@ -318,13 +324,13 @@ mod tests {
     use super::*;
     use rstest::*;
 
-    const SIMPLE_EMOJI: &'static str = "\u{1f60a}";
-    const THUMBS_UP_WITH_MODIFIER: &'static str = "\u{1f44d}\u{1f3fb}";
-    const FAMILY: &'static str = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f466}";
+    const SIMPLE_EMOJI: &str = "\u{1f60a}";
+    const THUMBS_UP_WITH_MODIFIER: &str = "\u{1f44d}\u{1f3fb}";
+    const FAMILY: &str = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f466}";
 
     pub fn cursor(offset: usize, selection_from: Option<usize>) -> Cursor {
         let offset = ByteOffset(offset);
-        let selection_from = selection_from.map(|n| ByteOffset(n));
+        let selection_from = selection_from.map(ByteOffset);
         Cursor { offset, selection_from, ..Default::default() }
     }
 
@@ -357,7 +363,7 @@ mod tests {
         let r = RopeBuffer::from_str(&s);
         let mut cursor = Cursor::new_with_offset(ByteOffset(r.len_bytes()));
 
-        let expected_offsets = vec![
+        let expected_offsets = [
             0,
             0,
             1,              // a (1 byte)

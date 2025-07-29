@@ -1,4 +1,3 @@
-use ropey;
 use unicode_segmentation::GraphemeCursor;
 use unicode_segmentation::GraphemeIncomplete;
 
@@ -70,7 +69,7 @@ impl<'a> RopeExt<'a> for ropey::RopeSlice<'a> {
     }
 }
 
-impl<'a> RopeExt<'a> for ropey::Rope {
+impl RopeExt<'_> for ropey::Rope {
     fn count_grapheme_clusters(&self) -> usize {
         let mut gr = GraphemeCursor::new(0, self.len_bytes(), true);
         let mut count = 0;

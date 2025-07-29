@@ -9,7 +9,6 @@ use reedline::EditCommand;
 use reedline::KeyCode;
 use reedline::KeyModifiers;
 use reedline::MenuBuilder;
-use unicode_names2;
 
 use crate::Action;
 use crate::PaneAction;
@@ -47,18 +46,18 @@ fn quote_path(s: &str) -> String {
 }
 
 fn parse_insertchar(s: &str) -> Option<char> {
-    if s.starts_with("U+") {
-        u32::from_str_radix(&s[2..], 16)
+    if let Some(s_hexadecimal) = s.strip_prefix("U+") {
+        u32::from_str_radix(s_hexadecimal, 16)
             .ok()
-            .and_then(|codepoint| char::from_u32(codepoint))
+            .and_then(char::from_u32)
     } else if s.starts_with(|c: char| c.is_ascii_digit()) {
         s.parse::<u32>()
             .ok()
-            .and_then(|codepoint| char::from_u32(codepoint))
+            .and_then(char::from_u32)
     } else if s.eq_ignore_ascii_case("zwj") {
         Some('\u{200d}')
     } else {
-        unicode_names2::character(&s)
+        unicode_names2::character(s)
     }
 }
 

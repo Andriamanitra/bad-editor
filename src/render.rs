@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use crossterm;
 use crossterm::{
     cursor::MoveTo,
     style::{Color, ContentStyle, Print, PrintStyledContent, Stylize},
@@ -113,7 +112,7 @@ impl App {
                 let mut n = content.len_lines();
                 let mut w = 1;
                 while n > 9 {
-                    n = n / 10;
+                    n /= 10;
                     w += 1;
                 }
                 w
@@ -130,7 +129,7 @@ impl App {
                 }
 
                 let console_row = (lineno - current_pane.viewport_position_row) as u16;
-                writer.queue(MoveTo(0, console_row as u16))?;
+                writer.queue(MoveTo(0, console_row))?;
                 let sidebar = format!(" {:width$} ", 1 + lineno, width=max_lineno_width);
                 writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
 
@@ -234,7 +233,7 @@ impl App {
             let cursor = self.current_pane().cursors.primary();
             let status_line_right = format!(
                 "col:{:<3} line:{:<3} {}/{}B",
-                1 + cursor.column(&content),
+                1 + cursor.column(content),
                 1 + content.byte_to_line(cursor.offset),
                 cursor.offset.0,
                 content.len_bytes()
