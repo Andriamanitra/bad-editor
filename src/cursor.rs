@@ -533,4 +533,15 @@ mod tests {
         let cursor = Cursor::default();
         assert_eq!(cursor.line_end(&r), expected, "expected {expected:?} for {s:?}");
     }
+
+    #[test]
+    fn insert_with_multicursor_same_offset() {
+        let mut r = RopeBuffer::from_str("abab");
+        let mut cursor = MultiCursor::new();
+        cursor.select_to(&r, MoveTarget::Right(2));
+        cursor.spawn_new_primary(Cursor::new_with_selection(ByteOffset(2), Some(ByteOffset(4))));
+        assert_eq!(cursor.cursors.len(), 2);
+        r.insert_with_cursors(&mut cursor, "x");
+        assert_eq!(r.to_string(), "xx");
+    }
 }
