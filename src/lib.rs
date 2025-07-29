@@ -6,7 +6,10 @@ mod cursor;
 mod rope_ext;
 mod highlighter;
 mod ropebuffer;
+mod pane;
 
+pub use pane::Pane;
+pub use pane::PaneAction;
 pub use rope_ext::RopeExt;
 pub use cursor::MultiCursor;
 
@@ -44,23 +47,6 @@ pub enum Action {
     CommandPromptEdit(String),
     SetInfo(String),
     HandledByPane(PaneAction),
-}
-
-#[derive(Debug, Clone)]
-pub enum PaneAction {
-    MoveTo(MoveTarget),
-    SelectTo(MoveTarget),
-    Insert(String),
-    DeleteBackward,
-    DeleteForward,
-    Indent,
-    Dedent,
-    Undo,
-    Redo,
-    Find(String),
-    RepeatFind,
-    RepeatFindBackward,
-    QuickAddNext,
 }
 
 #[derive(Debug, Clone, Copy)]
