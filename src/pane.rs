@@ -12,6 +12,7 @@ use crate::MultiCursor;
 pub enum PaneAction {
     MoveTo(MoveTarget),
     SelectTo(MoveTarget),
+    SelectAll,
     Insert(String),
     DeleteBackward,
     DeleteForward,
@@ -125,6 +126,12 @@ impl Pane {
             }
             PaneAction::SelectTo(target) => {
                 self.cursors.select_to(&self.content, target);
+            }
+            PaneAction::SelectAll => {
+                self.cursors.esc();
+                let cursor = self.cursors.primary_mut();
+                cursor.offset = ByteOffset(0);
+                cursor.select_to(&self.content, MoveTarget::End);
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);

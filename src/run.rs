@@ -88,6 +88,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('d') if ctrl => Action::HandledByPane(PaneAction::QuickAddNext),
                 KeyCode::Char('c') if ctrl => Action::Copy,
                 KeyCode::Char('v') if ctrl => Action::Paste,
+                KeyCode::Char('a') if ctrl => Action::HandledByPane(PaneAction::SelectAll),
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
                 KeyCode::Up =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }
