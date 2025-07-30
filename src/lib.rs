@@ -2,6 +2,7 @@ pub mod bad;
 mod prompt;
 mod render;
 mod run;
+mod editing;
 mod cursor;
 mod rope_ext;
 mod highlighter;

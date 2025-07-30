@@ -1,6 +1,7 @@
 use std::io::{BufReader, ErrorKind, Read};
 
 use crate::cursor::Cursor;
+use crate::editing::EditBatch;
 use crate::ropebuffer::RopeBuffer;
 use crate::ByteOffset;
 use crate::IndentKind;
@@ -83,6 +84,13 @@ impl Pane {
         Ok(())
     }
 
+    pub fn selections(&self) -> Vec<String> {
+        self.cursors.iter()
+            .filter_map(|cursor| cursor.selection())
+            .map(|sel| self.content.slice(&sel).to_string())
+            .collect()
+    }
+
     pub fn update_viewport_size(&mut self, columns: u16, rows: u16) {
         self.viewport_width = columns;
         self.viewport_height = rows;
@@ -114,19 +122,24 @@ impl Pane {
                 self.cursors.select_to(&self.content, target);
             }
             PaneAction::Insert(s) => {
-                self.content.insert_with_cursors(&mut self.cursors, &s);
+                let edits = EditBatch::insert_with_cursors(&self.cursors, &s);
+                self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::DeleteBackward => {
-                self.content.delete_backward_with_cursors(&mut self.cursors);
+                let edits = EditBatch::delete_backward_with_cursors(&self.cursors, &self.content);
+                self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::DeleteForward => {
-                self.content.delete_forward_with_cursors(&mut self.cursors);
+                let edits = EditBatch::delete_forward_with_cursors(&self.cursors, &self.content);
+                self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Indent => {
-                self.content.indent_with_cursors(&mut self.cursors, self.settings.indent_kind);
+                let edits = EditBatch::indent_with_cursors(&self.cursors, &self.content, self.settings.indent_kind);
+                self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Dedent => {
-                self.content.dedent_with_cursors(&mut self.cursors, self.settings.indent_kind);
+                let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_kind);
+                self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Undo => self.cursors = self.content.undo(self.cursors.clone()),
             PaneAction::Redo => self.cursors = self.content.redo(self.cursors.clone()),

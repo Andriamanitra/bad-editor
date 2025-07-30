@@ -29,6 +29,10 @@ impl MultiCursor {
             .expect("primary cursor should always exist")
     }
 
+    pub fn cursor_count(&self) -> usize {
+        self.cursors.len()
+    }
+
     pub fn spawn_new_primary(&mut self, new: Cursor) {
         self.cursors.push(new);
         self.primary_index = self.cursors.len() - 1;
@@ -62,25 +66,11 @@ impl MultiCursor {
         }
     }
 
-    pub fn update_positions_insertion(&mut self, offset: ByteOffset, length: usize) {
-        for cursor in self.iter_mut() {
-            cursor.update_pos_insertion(offset, length);
-        }
-    }
-
-    pub fn update_positions_deletion(&mut self, range: &Range<ByteOffset>) {
-        for cursor in self.iter_mut() {
-            cursor.update_pos_deletion(range);
-        }
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = &Cursor> {
-        // TODO: make sure cursors are iterated from first to last
         self.cursors.iter()
     }
 
     pub fn rev_iter(&self) -> impl Iterator<Item = &Cursor> {
-        // TODO: make sure cursors are iterated from last to first
         self.cursors.iter().rev()
     }
 
@@ -538,16 +528,5 @@ mod tests {
         let r = RopeBuffer::from_str(s);
         let cursor = Cursor::default();
         assert_eq!(cursor.line_end(&r), expected, "expected {expected:?} for {s:?}");
-    }
-
-    #[test]
-    fn insert_with_multicursor_same_offset() {
-        let mut r = RopeBuffer::from_str("abab");
-        let mut cursor = MultiCursor::new();
-        cursor.select_to(&r, MoveTarget::Right(2));
-        cursor.spawn_new_primary(Cursor::new_with_selection(ByteOffset(2), Some(ByteOffset(4))));
-        assert_eq!(cursor.cursors.len(), 2);
-        r.insert_with_cursors(&mut cursor, "x");
-        assert_eq!(r.to_string(), "xx");
     }
 }

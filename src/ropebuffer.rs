@@ -8,62 +8,14 @@ use crate::cursor::Cursor;
 use crate::RopeExt;
 use crate::ByteOffset;
 use crate::MultiCursor;
-use crate::IndentKind;
-
-#[derive(Debug)]
-struct EditBatch {
-    edits: Vec<Edit>,
-    cursors: MultiCursor
-}
-
-impl EditBatch {
-    fn new(edits: Vec<Edit>, cursors: MultiCursor) -> Self {
-        Self { edits, cursors }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Edit {
-    Insert(ByteOffset, Rope),
-    Delete(Range<ByteOffset>),
-}
-
-impl Edit {
-    pub fn insert_str(offset: ByteOffset, s: &str) -> Self {
-        Edit::Insert(offset, Rope::from(s))
-    }
-
-    pub fn delete(offset: ByteOffset, length: usize) -> Self {
-        let range = offset .. ByteOffset(offset.0 + length);
-        Edit::Delete(range)
-    }
-
-    pub fn pos(&self) -> ByteOffset {
-        match self {
-            Edit::Insert(offset, _) => *offset,
-            Edit::Delete(range) => range.start,
-        }
-    }
-}
-
-impl PartialOrd for Edit {
-    fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(rhs))
-    }
-}
-
-impl Ord for Edit {
-    fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
-        self.pos().cmp(&rhs.pos())
-    }
-}
+use crate::editing::{EditBatch, Edit};
 
 
 #[derive(Debug, Default)]
 pub struct RopeBuffer {
     rope: Rope,
-    undo: Vec<EditBatch>,
-    redo: Vec<EditBatch>,
+    undo: Vec<(EditBatch, MultiCursor)>,
+    redo: Vec<(EditBatch, MultiCursor)>,
 }
 
 impl RopeBuffer {
@@ -123,8 +75,8 @@ impl RopeBuffer {
         self.rope.byte_slice(range.start.0 .. range.end.0)
     }
 
-    fn edit_rope(&mut self, edits: &[Edit]) {
-        for edit in edits.iter().rev() {
+    fn edit_rope(&mut self, edits: &EditBatch) {
+        for edit in edits.rev_iter() {
             match edit {
                 Edit::Insert(offset, s) => self.insert_rope(*offset, s.clone()),
                 Edit::Delete(range) => self.remove(range),
@@ -132,143 +84,69 @@ impl RopeBuffer {
         }
     }
 
-    fn inverse_of(&self, edit: &Edit) -> Edit {
-        match edit {
-            Edit::Insert(offset, s) => Edit::delete(*offset, s.len_bytes()),
-            Edit::Delete(range) => Edit::Insert(range.start, self.slice(range).into()),
+    fn inverse_of(&self, edits: &EditBatch) -> EditBatch {
+        let mut inverted_edits = vec![];
+        let mut n_deleted: usize = 0;
+        let mut n_inserted: usize = 0;
+        for edit in edits.iter() {
+            inverted_edits.push(
+                match edit {
+                    Edit::Insert(offset, s) => {
+                        let mut offset = *offset;
+                        offset.0 += n_inserted;
+                        offset.0 -= n_deleted;
+                        n_inserted += s.len_bytes();
+                        Edit::delete(offset, s.len_bytes())
+                    }
+                    Edit::Delete(range) => {
+                        let mut range = range.clone();
+                        let rope = self.slice(&range).into();
+                        range.start.0 += n_inserted;
+                        range.start.0 -= n_deleted;
+                        range.end.0 += n_inserted;
+                        range.end.0 -= n_deleted;
+                        n_deleted += range.end.0 - range.start.0;
+                        Edit::Insert(range.start, rope)
+                    }
+                }
+            );
         }
+        EditBatch::from_edits(inverted_edits)
     }
 
-    fn finalize_edits(&mut self, mut edits: Vec<Edit>, cursors: &mut MultiCursor, old_cursors: MultiCursor) {
-        edits.sort_unstable();
-        self.undo.push(EditBatch::new(
-            edits.iter().map(|e| self.inverse_of(e)).collect(),
-            old_cursors
-        ));
+    pub fn do_edits(&mut self, cursors: &mut MultiCursor, edits: EditBatch) {
+        let cursors_before_edits = cursors.clone();
+        let inverted = self.inverse_of(&edits);
+        self.undo.push((inverted, cursors_before_edits));
+        for cursor in cursors.iter_mut() {
+            cursor.deselect();
+            let original_offset = cursor.offset;
+            for edit in edits.iter() {
+                match edit {
+                    Edit::Insert(offset, rope) => {
+                        if offset <= &original_offset {
+                            cursor.offset.0 += rope.len_bytes();
+                        }
+                    }
+                    Edit::Delete(range) => {
+                        if range.start <= original_offset {
+                            cursor.offset.0 -= range.end.0.min(original_offset.0) - range.start.0;
+                        }
+                    }
+                }
+            }
+        }
         self.edit_rope(&edits);
-
-        for edit in edits.iter().rev() {
-            match edit {
-                Edit::Insert(offset, s) => cursors.update_positions_insertion(*offset, s.len_bytes()),
-                Edit::Delete(range) => cursors.update_positions_deletion(range),
-            }
-        }
-    }
-
-    pub fn insert_with_cursors(&mut self, cursors: &mut MultiCursor, s: &str) {
-        self.redo.clear();
-        let old_cursors = cursors.clone();
-        let mut edits = vec![];
-        for cursor in cursors.iter() {
-            if let Some(selection) = cursor.selection() {
-                edits.push(Edit::Delete(selection));
-            }
-            edits.push(Edit::insert_str(cursor.offset, s));
-        }
-        self.finalize_edits(edits, cursors, old_cursors);
-    }
-
-    pub fn delete_backward_with_cursors(&mut self, cursors: &mut MultiCursor) {
-        self.redo.clear();
-        let old_cursors = cursors.clone();
-        let mut edits = vec![];
-        for cursor in cursors.iter_mut() {
-            match cursor.selection() {
-                Some(selection) => {
-                    cursor.offset = selection.start;
-                    cursor.deselect();
-                    edits.push(Edit::Delete(selection));
-                },
-                None => {
-                    let b = cursor.offset;
-                    let a = cursor.left(self, 1);
-                    if a != b {
-                        edits.push(Edit::Delete(a..b));
-                    }
-                }
-            }
-        }
-        self.finalize_edits(edits, cursors, old_cursors);
-    }
-
-    pub fn delete_forward_with_cursors(&mut self, cursors: &mut MultiCursor) {
-        self.redo.clear();
-        let old_cursors = cursors.clone();
-        let mut edits = vec![];
-        for cursor in cursors.iter_mut() {
-            match cursor.selection() {
-                Some(selection) => {
-                    cursor.offset = selection.start;
-                    cursor.deselect();
-                    edits.push(Edit::Delete(selection));
-                }
-                None => {
-                    let a = cursor.offset;
-                    let b = cursor.right(self, 1);
-                    if a != b {
-                        edits.push(Edit::Delete(a..b));
-                    }
-                }
-            }
-        }
-        self.finalize_edits(edits, cursors, old_cursors);
-    }
-
-    pub fn indent_with_cursors(&mut self, cursors: &mut MultiCursor, indent: IndentKind) {
-        self.redo.clear();
-        let indent = indent.string();
-        let old_cursors = cursors.clone();
-        let mut edits = vec![];
-
-        for cursor in cursors.iter() {
-            for lineno in cursor.line_span(self) {
-                let bpos = self.line_to_byte(lineno);
-                edits.push(Edit::insert_str(bpos, &indent));
-            }
-        }
-
-        self.finalize_edits(edits, cursors, old_cursors);
-    }
-
-    pub fn dedent_with_cursors(&mut self, cursors: &mut MultiCursor, indent: IndentKind) {
-        self.redo.clear();
-        let old_cursors = cursors.clone();
-        let mut edits = vec![];
-
-        for cursor in cursors.iter() {
-            for lineno in cursor.line_span(self) {
-                let bpos = self.line_to_byte(lineno);
-                match indent {
-                    IndentKind::Spaces(n) => {
-                        let n = n as usize;
-                        if bpos.0 + n < self.len_bytes()
-                        && (0..n).all(|i| b' ' == self.byte(ByteOffset(bpos.0 + i))) {
-                            let indent_range = bpos .. ByteOffset(bpos.0 + n);
-                            edits.push(Edit::Delete(indent_range));
-                        }
-                    }
-                    IndentKind::Tabs => {
-                        if self.byte(bpos) == b'\t' {
-                            let indent_range = bpos .. ByteOffset(bpos.0 + 1);
-                            edits.push(Edit::Delete(indent_range));
-                        }
-                    }
-                }
-            }
-        }
-
-        self.finalize_edits(edits, cursors, old_cursors);
     }
 
     /// Restores the last state from the undo stack (if any).
     /// Returns the updated positions of cursors.
     #[must_use]
     pub fn undo(&mut self, cursors: MultiCursor) -> MultiCursor {
-        if let Some(EditBatch { edits, cursors: memorized_cursors }) = self.undo.pop() {
-            let inverted = edits.iter().map(|e| self.inverse_of(e)).collect();
+        if let Some((edits, old_cursors)) = self.undo.pop() {
+            self.redo.push((self.inverse_of(&edits), cursors));
             self.edit_rope(&edits);
-            self.redo.push(EditBatch::new(inverted, cursors));
-            memorized_cursors
+            old_cursors
         } else {
             cursors
         }
@@ -278,11 +156,10 @@ impl RopeBuffer {
     /// Returns the updated positions of cursors.
     #[must_use]
     pub fn redo(&mut self, cursors: MultiCursor) -> MultiCursor {
-        if let Some(EditBatch { edits, cursors: memorized_cursors }) = self.redo.pop() {
-            let inverted = edits.iter().map(|e| self.inverse_of(e)).collect();
+        if let Some((edits, old_cursors)) = self.redo.pop() {
+            self.undo.push((self.inverse_of(&edits), cursors));
             self.edit_rope(&edits);
-            self.undo.push(EditBatch::new(inverted, cursors));
-            memorized_cursors
+            old_cursors
         } else {
             cursors
         }
@@ -440,11 +317,12 @@ mod tests {
     fn delete_at_eof() {
         let mut r = RopeBuffer::from_str("abc");
         let mut cursors = MultiCursor::new();
-        let cursor = cursors.primary_mut();
-        cursor.move_to(&r, crate::MoveTarget::Right(2));
-        r.delete_forward_with_cursors(&mut cursors);
+        cursors.move_to(&r, crate::MoveTarget::Right(2));
+        let del = EditBatch::delete_forward_with_cursors(&cursors, &r);
+        r.do_edits(&mut cursors, del);
         assert_eq!(r.to_string(), "ab");
-        r.delete_forward_with_cursors(&mut cursors);
+        let del = EditBatch::delete_forward_with_cursors(&cursors, &r);
+        r.do_edits(&mut cursors, del);
         assert_eq!(r.to_string(), "ab");
     }
 }
