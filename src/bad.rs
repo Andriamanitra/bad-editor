@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::Action;
 use crate::Pane;
+use crate::clipboard::Clipboard;
 use crate::highlighter::BadHighlighterManager;
 
 
@@ -17,6 +18,7 @@ pub struct App {
     pub(crate) state: AppState,
     pub(crate) action_queue: VecDeque<Action>,
     pub(crate) highlighting: BadHighlighterManager,
+    pub(crate) clipboard: Clipboard,
 }
 
 impl App {
@@ -29,7 +31,8 @@ impl App {
             info: None,
             state: AppState::Idle,
             action_queue: VecDeque::new(),
-            highlighting: BadHighlighterManager::new()
+            highlighting: BadHighlighterManager::new(),
+            clipboard: Clipboard::new(),
         }
     }
 
@@ -70,6 +73,13 @@ impl App {
             }
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),
+            Action::Copy => {
+                self.clipboard.copy(self.current_pane().selections());
+            }
+            Action::Paste => {
+                let clips = self.clipboard.content().to_vec();
+                self.current_pane_mut().insert_from_clipboard(&clips);
+            }
         }
     }
 }

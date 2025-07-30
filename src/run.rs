@@ -57,12 +57,13 @@ impl App {
 
 pub fn get_action(ev: &event::Event) -> Action {
     use event::Event::*;
-    match ev {
+    match ev.to_owned() {
         FocusGained => Action::None,
         FocusLost => Action::None,
         Resize(_, _) => Action::None,
         Mouse(_) => todo!(),
-        Paste(_) => todo!(),
+        // Only emitted when bracketed paste has been enabled
+        Paste(s) => Action::HandledByPane(PaneAction::Insert(s)),
         Key(
             kevent @ KeyEvent {
                 code,
@@ -73,7 +74,7 @@ pub fn get_action(ev: &event::Event) -> Action {
         ) => {
             let ctrl = modifiers.contains(KeyModifiers::CONTROL);
             let shift = modifiers.contains(KeyModifiers::SHIFT);
-            let only_shift = (*modifiers - KeyModifiers::SHIFT).is_empty();
+            let only_shift = (modifiers - KeyModifiers::SHIFT).is_empty();
             // TODO: no hard coding, read keybindings from a config file
             match code {
                 KeyCode::Char('q') if ctrl => Action::Quit,
@@ -85,6 +86,8 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('b') if ctrl => Action::HandledByPane(PaneAction::RepeatFindBackward),
                 KeyCode::Char('n') if ctrl => Action::HandledByPane(PaneAction::RepeatFind),
                 KeyCode::Char('d') if ctrl => Action::HandledByPane(PaneAction::QuickAddNext),
+                KeyCode::Char('c') if ctrl => Action::Copy,
+                KeyCode::Char('v') if ctrl => Action::Paste,
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
                 KeyCode::Up =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }

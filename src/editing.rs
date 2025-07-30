@@ -50,6 +50,21 @@ impl EditBatch {
         Self::from_edits(edits)
     }
 
+    pub fn insert_from_clipboard(cursors: &MultiCursor, clips: &[String]) -> Self {
+        if clips.len() == cursors.cursor_count() {
+            let mut edits = vec![];
+            for (cursor, s) in cursors.iter().zip(clips) {
+                edits.push(Edit::insert_str(cursor.offset, s));
+                if let Some(selection) = cursor.selection() {
+                    edits.push(Edit::Delete(selection));
+                }
+            }
+            Self::from_edits(edits)
+        } else {
+            Self::insert_with_cursors(cursors, &clips.join(""))
+        }
+    }
+
     pub fn delete_backward_with_cursors(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
         let mut edits = vec![];
         for cursor in cursors.iter() {

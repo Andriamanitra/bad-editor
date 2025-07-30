@@ -8,6 +8,7 @@ mod rope_ext;
 mod highlighter;
 mod ropebuffer;
 mod pane;
+mod clipboard;
 
 pub use pane::Pane;
 pub use pane::PaneAction;
@@ -48,6 +49,8 @@ pub enum Action {
     CommandPromptEdit(String),
     SetInfo(String),
     HandledByPane(PaneAction),
+    Copy,
+    Paste,
 }
 
 #[derive(Debug, Clone, Copy)]

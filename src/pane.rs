@@ -113,6 +113,11 @@ impl Pane {
         }
     }
 
+    pub fn insert_from_clipboard(&mut self, clips: &[String]) {
+        let edits = EditBatch::insert_from_clipboard(&self.cursors, clips);
+        self.content.do_edits(&mut self.cursors, edits);
+    }
+
     pub(crate) fn handle_event(&mut self, event: PaneAction) {
         match event {
             PaneAction::MoveTo(target) => {
