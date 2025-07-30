@@ -35,7 +35,32 @@ fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
     style
 }
 
-const BLUEISH: Color = Color::Rgb {  r: 0x3a, g: 0x44, b: 0x5e };
+fn unicode_line_break_symbol(grapheme_cluster: &str) -> Option<&'static str> {
+    // https://en.wikipedia.org/wiki/Newline#Unicode
+    // https://docs.rs/ropey/1.6.1/ropey/index.html#a-note-about-line-breaks
+    match grapheme_cluster {
+        // LINE FEED (U+000A)
+        "\n" => Some("⏎"),
+        // CARRIAGE RETURN (U+000D)
+        "\r" => Some("␍"),
+        // CRLF (U+000A U+000D)
+        "\r\n" => Some("␍␊"),
+        // VERTICAL TAB (U+000B)
+        "\u{000B}" => Some("␋"),
+        // FORM FEED (U+000C)
+        "\u{000C}" => Some("␌"),
+        // NEXT LINE (U+0085)
+        "\u{0085}" => Some("␤"),
+        // unfortunately there are no glyphs to represent the last two
+        // LINE SEPARATOR (U+2028)
+        "\u{2028}" => Some("<U+2028>"),
+        // PARAGRAPH SEPARATOR (U+2029)
+        "\u{2029}" => Some("<U+2029>"),
+        _ => None
+    }
+}
+
+const BLUEISH: Color = Color::Rgb {  r: 0x4a, g: 0x54, b: 0x6e };
 const DEFAULT_FG: Color = Color::White;
 const DEFAULT_BG: Color = Color::Rgb { r: 0x1a, g: 0x1a, b: 0x1a };
 const SELECTION_FG: Color = Color::Black;
@@ -174,9 +199,9 @@ impl App {
                                 writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width))))?;
                             }
                             visual_column = visual_column.map(|offset| offset + tab_width);
-                        } else if g == "\n" {
+                        } else if let Some(glyph) = unicode_line_break_symbol(g) {
                             if n_selections > 0 {
-                                writer.queue(PrintStyledContent(sel_style.with(BLUEISH).apply("⏎")))?;
+                                writer.queue(PrintStyledContent(sel_style.with(BLUEISH).apply(glyph)))?;
                             } else if is_cursor {
                                 writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
                             }

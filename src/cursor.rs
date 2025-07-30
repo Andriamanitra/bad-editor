@@ -263,8 +263,8 @@ impl Cursor {
         if current_line == content.len_lines() - 1 {
             ByteOffset(content.len_bytes())
         } else {
-            let next_line_start = content.line_to_byte(current_line + 1);
-            ByteOffset(next_line_start.0 - 1)
+            content.previous_boundary_from(content.line_to_byte(current_line + 1))
+                .expect("when there is a next line it must have a boundary before it")
         }
     }
 
