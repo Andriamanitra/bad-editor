@@ -125,16 +125,17 @@ impl Cursor {
         self.selection_from.take();
     }
 
-    pub fn target_byte_offset(&self, content: &RopeBuffer, target: MoveTarget) -> ByteOffset {
+    pub fn target_byte_offset(&self, content: &RopeBuffer, target: MoveTarget) -> Option<ByteOffset> {
         match target {
-            MoveTarget::Up(n) => self.up(content, n),
-            MoveTarget::Down(n) => self.down(content, n),
-            MoveTarget::Left(n) => self.left(content, n),
-            MoveTarget::Right(n) => self.right(content, n),
-            MoveTarget::Start => ByteOffset(0),
-            MoveTarget::End => ByteOffset(content.len_bytes()),
-            MoveTarget::StartOfLine => self.line_start(content),
-            MoveTarget::EndOfLine => self.line_end(content),
+            MoveTarget::Up(n) => Some(self.up(content, n)),
+            MoveTarget::Down(n) => Some(self.down(content, n)),
+            MoveTarget::Left(n) => Some(self.left(content, n)),
+            MoveTarget::Right(n) => Some(self.right(content, n)),
+            MoveTarget::Start => Some(ByteOffset(0)),
+            MoveTarget::End => Some(ByteOffset(content.len_bytes())),
+            MoveTarget::StartOfLine => Some(self.line_start(content)),
+            MoveTarget::EndOfLine => Some(self.line_end(content)),
+            MoveTarget::MatchingPair => self.matching_pair(content),
         }
     }
 
@@ -161,16 +162,22 @@ impl Cursor {
             }
             Some(_) => {
                 self.deselect();
-                self.move_to_byte(self.target_byte_offset(content, target));
+                if let Some(offset) = self.target_byte_offset(content, target) {
+                    self.move_to_byte(offset);
+                }
             }
             None => {
-                self.move_to_byte(self.target_byte_offset(content, target));
+                if let Some(offset) = self.target_byte_offset(content, target) {
+                    self.move_to_byte(offset);
+                }
             }
         }
     }
 
     pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
-        self.select_to_byte(self.target_byte_offset(content, target))
+        if let Some(offset) = self.target_byte_offset(content, target) {
+            self.select_to_byte(offset);
+        }
     }
 
     fn move_to_byte(&mut self, new_offset: ByteOffset) {
@@ -255,6 +262,47 @@ impl Cursor {
         } else {
             content.previous_boundary_from(content.line_to_byte(current_line + 1))
                 .expect("when there is a next line it must have a boundary before it")
+        }
+    }
+
+    pub fn matching_pair(&self, content: &RopeBuffer) -> Option<ByteOffset> {
+        let find_pair = |close: u8, open: u8, backwards: bool| -> Option<ByteOffset> {
+            let mut bytes = content.bytes_at(self.offset);
+            if backwards {
+                bytes.reverse();
+            } else {
+                bytes.next();
+            }
+            let mut depth = 1;
+            for (b, i) in bytes.zip(1..) {
+                if b == open {
+                    depth += 1;
+                }
+                if b == close {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(
+                            if backwards {
+                                ByteOffset(self.offset.0 - i)
+                            } else {
+                                ByteOffset(self.offset.0 + i)
+                            }
+                        )
+                    }
+                }
+            }
+            None
+        };
+        match content.get_byte(self.offset) {
+            Some(b'(') => find_pair(b')', b'(', false),
+            Some(b'[') => find_pair(b']', b'[', false),
+            Some(b'{') => find_pair(b'}', b'{', false),
+            Some(b'<') => find_pair(b'>', b'<', false),
+            Some(b')') => find_pair(b'(', b')', true),
+            Some(b']') => find_pair(b'[', b']', true),
+            Some(b'}') => find_pair(b'{', b'}', true),
+            Some(b'>') => find_pair(b'<', b'>', true),
+            _ => None
         }
     }
 
@@ -528,5 +576,28 @@ mod tests {
         let r = RopeBuffer::from_str(s);
         let cursor = Cursor::default();
         assert_eq!(cursor.line_end(&r), expected, "expected {expected:?} for {s:?}");
+    }
+
+    #[rstest]
+    #[case("((x))", 0, Some(ByteOffset(4)))]
+    #[case("[[x]]", 0, Some(ByteOffset(4)))]
+    #[case("<<x>>", 0, Some(ByteOffset(4)))]
+    #[case("{{x}}", 0, Some(ByteOffset(4)))]
+    #[case("((x))", 4, Some(ByteOffset(0)))]
+    #[case("[[x]]", 4, Some(ByteOffset(0)))]
+    #[case("<<x>>", 4, Some(ByteOffset(0)))]
+    #[case("{{x}}", 4, Some(ByteOffset(0)))]
+    #[case("(]", 0, None)]
+    #[case("[)", 1, None)]
+    #[case("(a)", 1, None)]
+    #[case("", 0, None)]
+    fn matching_pair(
+        #[case] s: &'static str,
+        #[case] start: usize,
+        #[case] expected: Option<ByteOffset>
+    ) {
+        let r = RopeBuffer::from_str(s);
+        let cursor = Cursor::new_with_offset(ByteOffset(start));
+        assert_eq!(cursor.matching_pair(&r), expected)
     }
 }

@@ -54,8 +54,16 @@ impl RopeBuffer {
         self.rope.byte_to_char(offset.0)
     }
 
+    pub fn get_byte(&self, offset: ByteOffset) -> Option<u8> {
+        self.rope.get_byte(offset.0)
+    }
+
     pub fn byte(&self, offset: ByteOffset) -> u8 {
         self.rope.byte(offset.0)
+    }
+
+    pub fn bytes_at(&self, offset: ByteOffset) -> ropey::iter::Bytes<'_> {
+        self.rope.bytes_at(offset.0)
     }
 
     fn insert_rope(&mut self, offset: ByteOffset, rope: Rope) {

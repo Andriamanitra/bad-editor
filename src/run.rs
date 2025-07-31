@@ -73,6 +73,7 @@ pub fn get_action(ev: &event::Event) -> Action {
             },
         ) => {
             let ctrl = modifiers.contains(KeyModifiers::CONTROL);
+            let alt = modifiers.contains(KeyModifiers::ALT);
             let shift = modifiers.contains(KeyModifiers::SHIFT);
             let only_shift = (modifiers - KeyModifiers::SHIFT).is_empty();
             // TODO: no hard coding, read keybindings from a config file
@@ -89,6 +90,10 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('c') if ctrl => Action::Copy,
                 KeyCode::Char('v') if ctrl => Action::Paste,
                 KeyCode::Char('a') if ctrl => Action::HandledByPane(PaneAction::SelectAll),
+                KeyCode::Char('M') if alt =>
+                    Action::HandledByPane(PaneAction::SelectTo(MoveTarget::MatchingPair)),
+                KeyCode::Char('m') if alt =>
+                    Action::HandledByPane(PaneAction::MoveTo(MoveTarget::MatchingPair)),
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
                 KeyCode::Up =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }

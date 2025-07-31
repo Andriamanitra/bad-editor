@@ -63,4 +63,5 @@ pub enum MoveTarget {
     End,
     StartOfLine,
     EndOfLine,
+    MatchingPair,
 }
