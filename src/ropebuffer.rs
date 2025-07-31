@@ -170,7 +170,7 @@ impl RopeBuffer {
         let mut new_cursors = vec![];
         for cursor in cursors.rev_iter() {
             let start = match cursor.selection_from {
-                Some(sel_from) => cursor.offset.max(sel_from),
+                Some(sel_from) => cursor.offset.min(sel_from),
                 None => cursor.offset,
             };
             if prev_found.is_none_or(|p| start < p) {
