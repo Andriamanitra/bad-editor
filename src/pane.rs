@@ -1,5 +1,8 @@
 use std::io::{BufReader, ErrorKind, Read};
+use std::num::NonZeroUsize;
+use std::path::PathBuf;
 
+use crate::cli::FilePathWithOptionalLocation;
 use crate::cursor::Cursor;
 use crate::editing::EditBatch;
 use crate::ropebuffer::RopeBuffer;
@@ -43,6 +46,7 @@ impl std::default::Default for PaneSettings {
 
 pub struct Pane {
     pub(crate) title: String,
+    pub(crate) path: Option<PathBuf>,
     pub(crate) content: RopeBuffer,
     pub(crate) viewport_position_row: usize,
     pub(crate) viewport_width: u16,
@@ -55,7 +59,8 @@ pub struct Pane {
 impl Pane {
     pub fn empty() -> Self {
         Self {
-            title: "bad.txt".to_string(),
+            title: "untitled".to_string(),
+            path: None,
             content: RopeBuffer::new(),
             cursors: MultiCursor::new(),
             viewport_position_row: 0,
@@ -68,8 +73,8 @@ impl Pane {
         }
     }
 
-    pub fn open_file(&mut self, path: &str) -> std::io::Result<()> {
-        let content = match std::fs::File::open(path) {
+    pub fn open_file(&mut self, fileloc: &FilePathWithOptionalLocation) -> std::io::Result<()> {
+        let content = match std::fs::File::open(&fileloc.path) {
             Ok(file) => {
                 // TODO: do something more efficient than this
                 let mut s = String::new();
@@ -79,9 +84,14 @@ impl Pane {
             Err(err) if err.kind() == ErrorKind::NotFound => RopeBuffer::new(),
             Err(err) => return Err(err)
         };
-        self.title = path.to_string();
+        self.title = fileloc.path.clone();
+        self.path = Some(PathBuf::from(&fileloc.path));
         self.content = content;
         self.cursors = MultiCursor::new();
+        if let Some(line_no) = fileloc.line {
+            let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());
+            self.cursors.primary_mut().move_to(&self.content, MoveTarget::Location(line_no, column_no));
+        }
         Ok(())
     }
 

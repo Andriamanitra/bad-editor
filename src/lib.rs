@@ -1,4 +1,5 @@
 pub mod bad;
+pub mod cli;
 mod prompt;
 mod render;
 mod run;

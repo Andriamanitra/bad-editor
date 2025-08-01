@@ -10,6 +10,7 @@ use reedline::KeyCode;
 use reedline::KeyModifiers;
 use reedline::MenuBuilder;
 
+use crate::cli::FilePathWithOptionalLocation;
 use crate::Action;
 use crate::PaneAction;
 
@@ -84,7 +85,7 @@ impl crate::bad::App {
                         self.enqueue(Action::HandledByPane(PaneAction::Insert(out)))
                     }
                 }
-                "open" => match self.current_pane_mut().open_file(&arg) {
+                "open" => match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(&arg)) {
                     Ok(()) => {},
                     Err(err) => {
                         let fpath = quote_path(&arg);

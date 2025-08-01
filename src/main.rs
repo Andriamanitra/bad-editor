@@ -1,6 +1,7 @@
 use std::io::stdout;
 
 use bad_editor::bad;
+use bad_editor::cli;
 use crossterm::ExecutableCommand;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::cursor::Hide as HideCursor;
@@ -21,8 +22,12 @@ impl Drop for TerminalGuard {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: CLI
-    let app = bad::App::new();
+    let mut app = bad::App::new();
+
+    let args = cli::parse_cli_args();
+    if let Some(file_loc) = args.get_one::<cli::FilePathWithOptionalLocation>("file") {
+        app.current_pane_mut().open_file(file_loc)?;
+    }
 
     // TerminalGuard ensures raw mode gets disabled if the app crashes.
     // Drop runs when variable leaves the scope, even on panic.
