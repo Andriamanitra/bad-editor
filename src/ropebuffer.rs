@@ -284,6 +284,7 @@ impl Display for RopeBuffer {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
