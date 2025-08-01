@@ -69,6 +69,35 @@ const LIGHT_GREY: Color = Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa };
 const LIGHTER_BG: Color = Color::Rgb { r: 0x24, g: 0x24, b: 0x24 };
 
 impl App {
+    fn status_line_text_left(&self) -> &str {
+        &self.current_pane().title
+    }
+
+    fn status_line_text_right(&self) -> String {
+        let pane = self.current_pane();
+        let content = &pane.content;
+        let cursor = self.current_pane().cursors.primary();
+        let filesize = content.len_bytes();
+        let fsize_indicator = if filesize < 10_000 {
+            format!("{}/{}B", cursor.offset.0, filesize)
+        } else {
+            const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
+            let mut unit = 0;
+            let mut filesize = filesize as f32;
+            while filesize >= 1024.0 {
+                filesize /= 1024.0;
+                unit += 1;
+            }
+            format!("{:.decimal_places$}{}", filesize, UNITS[unit], decimal_places=if filesize < 10.0 { 2 } else { 1 })
+        };
+        format!(
+            " col:{:<3} line:{:<3} {}",
+            1 + cursor.column(content),
+            1 + content.byte_to_line(cursor.offset),
+            fsize_indicator
+        )
+    }
+
     pub fn render(&mut self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         let now = Instant::now();
         let wsize = crossterm::terminal::window_size()?;
@@ -253,16 +282,9 @@ impl App {
             writer.queue(MoveTo(0, wsize.rows - 2))?;
             writer.queue(crossterm::style::SetStyle(default_style.negative()))?;
             let width = wsize.columns as usize;
-            let status_line_title = format!("{:width$}", self.current_pane().title, width = width);
-            writer.queue(PrintStyledContent(default_style.negative().apply(status_line_title)))?;
-            let cursor = self.current_pane().cursors.primary();
-            let status_line_right = format!(
-                "col:{:<3} line:{:<3} {}/{}B",
-                1 + cursor.column(content),
-                1 + content.byte_to_line(cursor.offset),
-                cursor.offset.0,
-                content.len_bytes()
-            );
+            let status_line_left = format!("{:width$}", self.status_line_text_left(), width = width);
+            writer.queue(PrintStyledContent(default_style.negative().apply(status_line_left)))?;
+            let status_line_right = self.status_line_text_right();
             writer.queue(MoveTo((width - status_line_right.len()) as u16, wsize.rows - 2))?;
             writer.queue(PrintStyledContent(default_style.negative().apply(status_line_right)))?;
 
