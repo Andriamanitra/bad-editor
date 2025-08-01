@@ -10,6 +10,8 @@ mod ropebuffer;
 mod pane;
 mod clipboard;
 
+use std::num::NonZeroUsize;
+
 pub use pane::Pane;
 pub use pane::PaneAction;
 pub use rope_ext::RopeExt;
@@ -59,6 +61,7 @@ pub enum MoveTarget {
     Down(usize),
     Left(usize),
     Right(usize),
+    Location(NonZeroUsize, NonZeroUsize),
     Start,
     End,
     StartOfLine,

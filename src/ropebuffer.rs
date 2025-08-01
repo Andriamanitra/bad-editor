@@ -40,6 +40,10 @@ impl RopeBuffer {
         ByteOffset(self.rope.line_to_byte(line))
     }
 
+    pub fn try_line_to_byte(&self, line: usize) -> Option<ByteOffset> {
+        self.rope.try_line_to_byte(line).ok().map(ByteOffset)
+    }
+
     pub fn byte_to_line(&self, offset: ByteOffset) -> usize {
         self.rope.byte_to_line(offset.0)
     }

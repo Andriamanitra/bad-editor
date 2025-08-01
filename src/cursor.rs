@@ -136,6 +136,15 @@ impl Cursor {
             MoveTarget::StartOfLine => Some(self.line_start(content)),
             MoveTarget::EndOfLine => Some(self.line_end(content)),
             MoveTarget::MatchingPair => self.matching_pair(content),
+            MoveTarget::Location(line_no, column_no) => {
+                let line = line_no.get() - 1;
+                let col = column_no.get() - 1;
+                if let Some(line_start) = content.try_line_to_byte(line) {
+                    Some(Cursor::new_with_offset(line_start).offset_at_column(content, col))
+                } else {
+                    Some(ByteOffset(content.len_bytes()))
+                }
+            }
         }
     }
 
@@ -303,36 +312,6 @@ impl Cursor {
             Some(b'}') => find_pair(b'{', b'}', true),
             Some(b'>') => find_pair(b'<', b'>', true),
             _ => None
-        }
-    }
-
-    pub fn update_pos_deletion(&mut self, del: &std::ops::Range<ByteOffset>) {
-        if self.offset > del.end {
-            self.offset.0 -= del.end.0 - del.start.0;
-        } else if self.offset > del.start {
-            self.offset.0 = del.start.0;
-        }
-        if let Some(sel) = self.selection_from {
-            if sel > del.end {
-                let length = del.end.0 - del.start.0;
-                self.selection_from.replace(ByteOffset(sel.0 - length));
-            } else if sel > del.start {
-                self.selection_from.replace(ByteOffset(del.start.0));
-            }
-        }
-        if self.selection_from == Some(self.offset) {
-            self.selection_from.take();
-        }
-    }
-
-    pub fn update_pos_insertion(&mut self, pos: ByteOffset, length: usize) {
-        if pos <= self.offset {
-            self.offset.0 += length;
-        }
-        if let Some(mut sel) = self.selection_from {
-            if pos <= sel {
-                sel.0 += length;
-            }
         }
     }
 
