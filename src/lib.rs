@@ -67,7 +67,7 @@ pub enum MoveTarget {
     End,
     StartOfLine,
     EndOfLine,
-    StartOfWord,
-    EndOfWord,
+    NextWordBoundaryLeft,
+    NextWordBoundaryRight,
     MatchingPair,
 }

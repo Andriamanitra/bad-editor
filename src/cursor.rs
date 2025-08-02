@@ -135,8 +135,8 @@ impl Cursor {
             MoveTarget::End => Some(ByteOffset(content.len_bytes())),
             MoveTarget::StartOfLine => Some(self.line_start(content)),
             MoveTarget::EndOfLine => Some(self.line_end(content)),
-            MoveTarget::StartOfWord => Some(self.word_start(content)),
-            MoveTarget::EndOfWord => Some(self.word_end(content)),
+            MoveTarget::NextWordBoundaryLeft => Some(self.word_boundary_left(content)),
+            MoveTarget::NextWordBoundaryRight => Some(self.word_boundary_right(content)),
             MoveTarget::MatchingPair => self.matching_pair(content),
             MoveTarget::Location(line_no, column_no) => {
                 let line = line_no.get() - 1;
@@ -276,7 +276,7 @@ impl Cursor {
         }
     }
 
-    pub fn word_start(&self, content: &RopeBuffer) -> ByteOffset {
+    pub fn word_boundary_left(&self, content: &RopeBuffer) -> ByteOffset {
         let mut p = self.offset;
         while let Some(prev) = content.previous_boundary_from(p) {
             if content.is_word_boundary(prev) {
@@ -287,7 +287,7 @@ impl Cursor {
         ByteOffset(0)
     }
 
-    pub fn word_end(&self, content: &RopeBuffer) -> ByteOffset {
+    pub fn word_boundary_right(&self, content: &RopeBuffer) -> ByteOffset {
         let mut p = self.offset;
         while let Some(next) = content.next_boundary_from(p) {
             if content.is_word_boundary(next) {
