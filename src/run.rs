@@ -101,12 +101,16 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Down =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Down(1))) }
                     else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(1))) },
-                KeyCode::Left =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Left(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Left(1))) },
-                KeyCode::Right =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Right(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Right(1))) },
+                KeyCode::Left => {
+                    let target = if ctrl { MoveTarget::StartOfWord } else { MoveTarget::Left(1) };
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(target)) }
+                }
+                KeyCode::Right => {
+                    let target = if ctrl { MoveTarget::EndOfWord } else { MoveTarget::Right(1) };
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(target)) }
+                }
                 KeyCode::Home if ctrl =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Start)) }
                     else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Start)) },

@@ -135,6 +135,8 @@ impl Cursor {
             MoveTarget::End => Some(ByteOffset(content.len_bytes())),
             MoveTarget::StartOfLine => Some(self.line_start(content)),
             MoveTarget::EndOfLine => Some(self.line_end(content)),
+            MoveTarget::StartOfWord => Some(self.word_start(content)),
+            MoveTarget::EndOfWord => Some(self.word_end(content)),
             MoveTarget::MatchingPair => self.matching_pair(content),
             MoveTarget::Location(line_no, column_no) => {
                 let line = line_no.get() - 1;
@@ -272,6 +274,28 @@ impl Cursor {
             content.previous_boundary_from(content.line_to_byte(current_line + 1))
                 .expect("when there is a next line it must have a boundary before it")
         }
+    }
+
+    pub fn word_start(&self, content: &RopeBuffer) -> ByteOffset {
+        let mut p = self.offset;
+        while let Some(prev) = content.previous_boundary_from(p) {
+            if content.is_word_boundary(prev) {
+                return prev
+            }
+            p = prev;
+        }
+        ByteOffset(0)
+    }
+
+    pub fn word_end(&self, content: &RopeBuffer) -> ByteOffset {
+        let mut p = self.offset;
+        while let Some(next) = content.next_boundary_from(p) {
+            if content.is_word_boundary(next) {
+                return next
+            }
+            p = next;
+        }
+        ByteOffset(content.len_bytes())
     }
 
     pub fn matching_pair(&self, content: &RopeBuffer) -> Option<ByteOffset> {

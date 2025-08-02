@@ -70,6 +70,56 @@ impl RopeBuffer {
         self.rope.bytes_at(offset.0)
     }
 
+    pub fn is_word_boundary(&self, offset: ByteOffset) -> bool {
+        // The unicode segmentation crates don't currently (as of August 2025) provide
+        // an API for word boundaries that would be usable with Rope so we will use a
+        // simple implementation that should be reasonable for the simplest of cases.
+        // Unicode defines more thorough word boundary rules that might be worth
+        // implementing: https://www.unicode.org/reports/tr29/#Word_Boundaries
+
+        fn is_midletter(c: char) -> bool {
+            matches!(c, '\u{003A}' | '\u{00B7}' | '\u{0387}' | '\u{055F}' | '\u{05F4}' | '\u{2027}' | '\u{FE13}' | '\u{FE55}' | '\u{FF1A}')
+        }
+
+        fn is_midnumletq(c: char) -> bool {
+            matches!(c, '\u{002E}' | '\u{2018}' | '\u{2019}' | '\u{2024}' | '\u{FE52}' | '\u{FF07}' | '\u{FF0E}' | '\u{0027}')
+        }
+
+        fn is_midnum(c: char) -> bool {
+            matches!(c, '\u{066C}' | '\u{FE50}' | '\u{FE54}' | '\u{FF0C}' |  '\u{FF1B}')
+        }
+
+        let char_offset = self.byte_to_char(offset);
+        let mut prevs = self.rope.chars_at(char_offset);
+        let mut nexts = self.rope.chars_at(char_offset);
+        let Some(prev) = prevs.prev() else { return true };
+        let Some(next) = nexts.next() else { return true };
+        if prev.is_whitespace() && next.is_whitespace() {
+            return false
+        }
+        if (prev.is_alphanumeric() || prev == '_') && (next.is_alphanumeric() || next == '_') {
+            return false
+        }
+        if prev.is_ascii_punctuation() && next.is_ascii_punctuation() {
+            return false
+        }
+        let prevprev = prevs.prev();
+        let nextnext = nexts.next();
+        if prev.is_alphabetic() && (is_midletter(next) || is_midnumletq(next)) && nextnext.is_some_and(|c| c.is_alphabetic()) {
+            return false
+        }
+        if next.is_alphabetic() && (is_midletter(prev) || is_midnumletq(prev)) && prevprev.is_some_and(|c| c.is_alphabetic()) {
+            return false
+        }
+        if prev.is_numeric() && (is_midnum(next) || is_midnumletq(next)) && nextnext.is_some_and(|c| c.is_numeric()) {
+            return false
+        }
+        if next.is_numeric() && (is_midnum(prev) || is_midnumletq(prev)) && prevprev.is_some_and(|c| c.is_numeric()) {
+            return false
+        }
+        true
+    }
+
     fn insert_rope(&mut self, offset: ByteOffset, rope: Rope) {
         let char_idx = self.byte_to_char(offset);
         let tail = self.rope.split_off(char_idx);
@@ -337,5 +387,30 @@ mod tests {
         let del = EditBatch::delete_forward_with_cursors(&cursors, &r);
         r.do_edits(&mut cursors, del);
         assert_eq!(r.to_string(), "ab");
+    }
+
+    #[test]
+    fn word_boundary_hello_world() {
+        let r = RopeBuffer::from_str("hello world");
+        assert!(r.is_word_boundary(ByteOffset(0)));
+        assert!(!r.is_word_boundary(ByteOffset(1)));
+        assert!(r.is_word_boundary(ByteOffset(5)));
+        assert!(r.is_word_boundary(ByteOffset(6)));
+        assert!(r.is_word_boundary(ByteOffset(11)));
+    }
+
+    #[test]
+    fn word_boundary_decimal_number() {
+        let r = RopeBuffer::from_str(" 1_002.34");
+        assert!(r.is_word_boundary(ByteOffset(0)));
+        assert!(r.is_word_boundary(ByteOffset(1)));
+        assert!(!r.is_word_boundary(ByteOffset(2)));
+        assert!(!r.is_word_boundary(ByteOffset(3)));
+        assert!(!r.is_word_boundary(ByteOffset(4)));
+        assert!(!r.is_word_boundary(ByteOffset(5)));
+        assert!(!r.is_word_boundary(ByteOffset(6)));
+        assert!(!r.is_word_boundary(ByteOffset(7)));
+        assert!(!r.is_word_boundary(ByteOffset(8)));
+        assert!(r.is_word_boundary(ByteOffset(9)));
     }
 }
