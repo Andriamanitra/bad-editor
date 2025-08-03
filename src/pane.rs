@@ -1,6 +1,7 @@
 use std::io::{BufReader, ErrorKind, Read};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cli::FilePathWithOptionalLocation;
 use crate::cursor::Cursor;
@@ -32,14 +33,63 @@ pub enum PaneAction {
 #[derive(Debug)]
 pub struct PaneSettings {
     pub tab_width: usize,
-    pub indent_kind: IndentKind
+    pub indent_kind: IndentKind,
+    pub indent_width: usize,
+}
+
+impl PaneSettings {
+    fn indent_as_string(&self) -> String {
+        match self.indent_kind {
+            IndentKind::Spaces => {
+                " ".repeat(self.indent_width)
+            }
+            IndentKind::Tabs => {
+                let mut width = 0;
+                let mut indent = String::new();
+                if self.tab_width > 0 {
+                    while width + self.tab_width <= self.indent_width {
+                        indent.push('\t');
+                        width += self.tab_width;
+                    }
+                }
+                if width < self.indent_width {
+                    indent.push_str(&" ".repeat(self.indent_width - width));
+                }
+                indent
+            }
+        }
+    }
+
+    fn from_editorconfig(path: impl AsRef<Path>) -> Self {
+        use ec4rs::property::*;
+        let mut settings = Self::default();
+        if let Ok(props) = ec4rs::properties_of(path) {
+            if let Ok(TabWidth::Value(n)) = props.get::<TabWidth>() {
+                settings.tab_width = n;
+            }
+            if let Ok(indent_kind) = props.get::<IndentStyle>() {
+                settings.indent_kind = match indent_kind {
+                    IndentStyle::Tabs => IndentKind::Tabs,
+                    IndentStyle::Spaces => IndentKind::Spaces,
+                };
+            }
+            if let Ok(indent_width) = props.get::<IndentSize>() {
+                settings.indent_width = match indent_width {
+                    IndentSize::UseTabWidth => settings.tab_width,
+                    IndentSize::Value(n) => n
+                };
+            }
+        }
+        settings
+    }
 }
 
 impl std::default::Default for PaneSettings {
     fn default() -> Self {
         PaneSettings {
             tab_width: 4,
-            indent_kind: IndentKind::default()
+            indent_kind: IndentKind::Spaces,
+            indent_width: 4,
         }
     }
 }
@@ -88,6 +138,7 @@ impl Pane {
         self.path = Some(PathBuf::from(&fileloc.path));
         self.content = content;
         self.cursors = MultiCursor::new();
+        self.settings = PaneSettings::from_editorconfig(&fileloc.path);
         if let Some(line_no) = fileloc.line {
             let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());
             self.cursors.primary_mut().move_to(&self.content, MoveTarget::Location(line_no, column_no));
@@ -156,11 +207,12 @@ impl Pane {
                 self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Indent => {
-                let edits = EditBatch::indent_with_cursors(&self.cursors, &self.content, self.settings.indent_kind);
+                let indent = self.settings.indent_as_string();
+                let edits = EditBatch::indent_with_cursors(&self.cursors, &self.content, &indent);
                 self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Dedent => {
-                let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_kind);
+                let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_width, self.settings.tab_width);
                 self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Undo => self.cursors = self.content.undo(self.cursors.clone()),

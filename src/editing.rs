@@ -3,7 +3,6 @@ use std::ops::Range;
 
 use ropey::Rope;
 
-use crate::IndentKind;
 use crate::MultiCursor;
 use crate::ByteOffset;
 use crate::ropebuffer::RopeBuffer;
@@ -103,8 +102,7 @@ impl EditBatch {
         Self::from_edits(edits)
     }
 
-    pub fn indent_with_cursors(cursors: &MultiCursor, content: &RopeBuffer, indent: IndentKind) -> Self {
-        let indent = indent.string();
+    pub fn indent_with_cursors(cursors: &MultiCursor, content: &RopeBuffer, indent: &str) -> Self {
         let mut edits = vec![];
 
         for cursor in cursors.iter() {
@@ -117,28 +115,28 @@ impl EditBatch {
         Self::from_edits(edits)
     }
 
-    pub fn dedent_with_cursors(cursors: &MultiCursor, content: &RopeBuffer, indent: IndentKind) -> Self {
+    pub fn dedent_with_cursors(cursors: &MultiCursor, content: &RopeBuffer, indent_width: usize, tab_width: usize) -> Self {
         let mut edits = vec![];
 
         for cursor in cursors.iter() {
             for lineno in cursor.line_span(content) {
-                let bpos = content.line_to_byte(lineno);
-                match indent {
-                    IndentKind::Spaces(n) => {
-                        let n = n as usize;
-                        if bpos.0 + n < content.len_bytes()
-                        && (0..n).all(|i| b' ' == content.byte(ByteOffset(bpos.0 + i))) {
-                            let indent_range = bpos .. ByteOffset(bpos.0 + n);
-                            edits.push(Edit::Delete(indent_range));
+                let start_of_line = content.line_to_byte(lineno);
+                let mut end_of_dedent = start_of_line;
+                let mut removed_width = 0;
+                let mut bytes_iter = content.bytes_at(start_of_line);
+                while removed_width < indent_width {
+                    match bytes_iter.next() {
+                        Some(b' ') => {
+                            removed_width += 1;
                         }
-                    }
-                    IndentKind::Tabs => {
-                        if content.byte(bpos) == b'\t' {
-                            let indent_range = bpos .. ByteOffset(bpos.0 + 1);
-                            edits.push(Edit::Delete(indent_range));
+                        Some(b'\t') => {
+                            removed_width += tab_width;
                         }
+                        _ => break
                     }
+                    end_of_dedent = ByteOffset(end_of_dedent.0 + 1);
                 }
+                edits.push(Edit::Delete(start_of_line .. end_of_dedent));
             }
         }
 

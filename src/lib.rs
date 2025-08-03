@@ -26,21 +26,8 @@ impl ByteOffset {
 
 #[derive(Debug, Clone, Copy)]
 pub enum IndentKind {
-    Spaces(u8),
+    Spaces,
     Tabs
-}
-impl std::default::Default for IndentKind {
-    fn default() -> Self {
-        IndentKind::Spaces(4)
-    }
-}
-impl IndentKind {
-    fn string(&self) -> String {
-        match self {
-            IndentKind::Spaces(n) => " ".repeat(*n as usize),
-            IndentKind::Tabs => "\t".to_string(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
