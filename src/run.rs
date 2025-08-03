@@ -128,7 +128,11 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Enter => Action::HandledByPane(PaneAction::Insert("\n".into())),
                 KeyCode::Tab => Action::HandledByPane(PaneAction::Indent),
                 KeyCode::BackTab => Action::HandledByPane(PaneAction::Dedent),
+                KeyCode::Backspace if ctrl => Action::HandledByPane(PaneAction::DeleteWord),
                 KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
+                // "KeyCode::Backspace if ctrl" only works in terminals that support Kitty Keyboard Protocol.
+                // In other terminals the event for Ctrl+Backspace seems to just look like Ctrl+h.
+                KeyCode::Char('h') if ctrl => Action::HandledByPane(PaneAction::DeleteWord),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
                 KeyCode::Esc => Action::Esc,
                 _ => Action::SetInfo(format!("{kevent:?}")),

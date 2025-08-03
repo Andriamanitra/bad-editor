@@ -20,6 +20,7 @@ pub enum PaneAction {
     Insert(String),
     DeleteBackward,
     DeleteForward,
+    DeleteWord,
     Indent,
     Dedent,
     Undo,
@@ -204,6 +205,10 @@ impl Pane {
             }
             PaneAction::DeleteForward => {
                 let edits = EditBatch::delete_forward_with_cursors(&self.cursors, &self.content);
+                self.content.do_edits(&mut self.cursors, edits);
+            }
+            PaneAction::DeleteWord => {
+                let edits = EditBatch::delete_word_with_cursors(&self.cursors, &self.content);
                 self.content.do_edits(&mut self.cursors, edits);
             }
             PaneAction::Indent => {

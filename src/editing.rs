@@ -83,6 +83,31 @@ impl EditBatch {
         Self::from_edits(edits)
     }
 
+    pub fn delete_word_with_cursors(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
+        let mut edits = vec![];
+        for cursor in cursors.iter() {
+            match cursor.selection() {
+                Some(selection) => {
+                    edits.push(Edit::Delete(selection));
+                }
+                None => {
+                    let a = cursor.word_boundary_left(content);
+                    let b = cursor.offset;
+                    // if there is only a single space between cursor and previous word boundary
+                    // we also want to delete the previous word
+                    if a.0 + 1 == b.0 && content.byte(a) == b' ' {
+                        let cursor = crate::cursor::Cursor::new_with_offset(a);
+                        let a = cursor.word_boundary_left(content);
+                        edits.push(Edit::Delete(a..b));
+                    } else {
+                        edits.push(Edit::Delete(a..b));
+                    }
+                }
+            }
+        }
+        Self::from_edits(edits)
+    }
+
     pub fn delete_forward_with_cursors(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
         let mut edits = vec![];
         for cursor in cursors.iter() {
@@ -200,9 +225,8 @@ mod tests {
             Edit::Delete(ByteOffset(5)..ByteOffset(10)),
             Edit::Delete(ByteOffset(25)..ByteOffset(30)),
         ];
-        
         let batch = EditBatch::from_edits(edits);
-        
+
         // Should be sorted but otherwise remain unchanged
         assert_eq!(batch.edits.len(), 3);
         assert_eq!(batch.edits[0], Edit::Delete(ByteOffset(5)..ByteOffset(10)));
@@ -216,9 +240,8 @@ mod tests {
             Edit::Delete(ByteOffset(10)..ByteOffset(20)),
             Edit::Delete(ByteOffset(5)..ByteOffset(15)),
         ];
-        
         let batch = EditBatch::from_edits(edits);
-        
+
         assert_eq!(batch.edits.len(), 2);
         assert_eq!(batch.edits[0], Edit::Delete(ByteOffset(5)..ByteOffset(10)));
         assert_eq!(batch.edits[1], Edit::Delete(ByteOffset(10)..ByteOffset(20)));
@@ -240,11 +263,10 @@ mod tests {
             Edit::Delete(ByteOffset(20)..ByteOffset(30)),
             Edit::insert_str(ByteOffset(25), "world"),
         ];
-        
+
         let batch = EditBatch::from_edits(edits);
-        
+
         assert_eq!(batch.edits.len(), 4);
-        
         assert_eq!(batch.edits[0], Edit::Delete(ByteOffset(5)..ByteOffset(12)));  // Truncated
         assert_eq!(batch.edits[1], Edit::insert_str(ByteOffset(12), "hello"));
         assert_eq!(batch.edits[2], Edit::Delete(ByteOffset(20)..ByteOffset(25))); // Truncated  
@@ -275,8 +297,28 @@ mod tests {
         cursors.select_to(&r, crate::MoveTarget::Right(2));
         cursors.spawn_new_primary(crate::cursor::Cursor::new_with_selection(ByteOffset(2), Some(ByteOffset(4))));
         assert_eq!(cursors.cursor_count(), 2);
-        let edits = crate::editing::EditBatch::insert_with_cursors(&cursors, "x");
+        let edits = EditBatch::insert_with_cursors(&cursors, "x");
         r.do_edits(&mut cursors, edits);
         assert_eq!(r.to_string(), "xx");
+    }
+
+    #[test]
+    fn delete_word() {
+        let mut r = RopeBuffer::from_str("hello xxxxxworld");
+        let mut cursors = MultiCursor::new();
+        cursors.move_to(&r, crate::MoveTarget::Right(11));
+        let edits = EditBatch::delete_word_with_cursors(&cursors, &r);
+        r.do_edits(&mut cursors, edits);
+        assert_eq!(r.to_string(), "hello world")
+    }
+
+    #[test]
+    fn delete_word_and_space() {
+        let mut r = RopeBuffer::from_str("hello xxxxx world");
+        let mut cursors = MultiCursor::new();
+        cursors.move_to(&r, crate::MoveTarget::Right(12));
+        let edits = EditBatch::delete_word_with_cursors(&cursors, &r);
+        r.do_edits(&mut cursors, edits);
+        assert_eq!(r.to_string(), "hello world")
     }
 }
