@@ -101,6 +101,7 @@ dependencies = [
  "rstest",
  "syntect",
  "unicode-segmentation",
+ "unicode-width",
  "unicode_names2",
 ]
 
