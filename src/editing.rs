@@ -133,7 +133,7 @@ impl EditBatch {
         for cursor in cursors.iter() {
             for lineno in cursor.line_span(content) {
                 let bpos = content.line_to_byte(lineno);
-                edits.push(Edit::insert_str(bpos, &indent));
+                edits.push(Edit::insert_str(bpos, indent));
             }
         }
 
