@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use crossterm::{
     cursor::MoveTo,
-    style::{Color, ContentStyle, Print, PrintStyledContent, Stylize},
+    style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
     QueueableCommand,
 };
@@ -58,6 +58,88 @@ fn unicode_line_break_symbol(grapheme_cluster: &str) -> Option<&'static str> {
         // PARAGRAPH SEPARATOR (U+2029)
         "\u{2029}" => Some("<U+2029>"),
         _ => None
+    }
+}
+
+fn replacement_symbol(g: &str) -> Option<String> {
+    if g.len() != 1 {
+        return None
+    }
+    g.chars().next().and_then(|c|
+        if c.is_control() {
+            Some(format!("<{:02}>", c as u32))
+        } else {
+            None
+        }
+    )
+}
+
+struct RenderingContext {
+    n_selections: usize,
+    is_cursor: bool,
+    current_column: usize,
+    visible_from_column: usize,
+    available_columns: usize,
+    tab_width: usize,
+    token_style: ContentStyle,
+    queue: Vec<(usize, usize, StyledContent<String>)>
+}
+impl RenderingContext {
+    fn is_selection(&self) -> bool {
+        self.n_selections > 0
+    }
+
+    fn push(&mut self, g: StyledContent<String>) {
+        let width = UnicodeWidthStr::width(g.content().as_str());
+        self.queue.push((self.current_column, width, g));
+        self.current_column += width;
+    }
+}
+
+fn grapheme_representation(g: &str, ctx: &mut RenderingContext) {
+    let sel_style = ContentStyle::new().with(SELECTION_FG).on(SELECTION_BG);
+    let escaped_style = ContentStyle::new().with(DEFAULT_FG).on(BLUEISH);
+
+    if g == "\t" {
+        if ctx.tab_width > 0 {
+            let w = ctx.tab_width - (ctx.current_column % ctx.tab_width);
+            // push the spaces as separate tokens in case the line is horizontally scrolled such
+            // that we need to cut the line in the middle of a tab
+            if ctx.is_selection() {
+                for _ in 0..w {
+                    ctx.push(sel_style.apply(" ".into()));
+                }
+            } else if ctx.is_cursor {
+                ctx.push(ctx.token_style.reverse().apply(" ".to_string()));
+                for _ in 1..w {
+                    ctx.push(ctx.token_style.apply(" ".into()));
+                }
+            } else {
+                for _ in 0..w {
+                    ctx.push(ctx.token_style.apply(" ".into()));
+                }
+            }
+        }
+    } else if let Some(glyph) = unicode_line_break_symbol(g) {
+        if ctx.is_selection() {
+            ctx.push(sel_style.with(BLUEISH).apply(glyph.into()));
+        } else if ctx.is_cursor {
+            ctx.push(ctx.token_style.reverse().apply(" ".into()));
+        }
+    } else if let Some(disp) = replacement_symbol(g) {
+        if ctx.is_selection() {
+            ctx.push(sel_style.with(BLUEISH).apply(disp));
+        } else if ctx.is_cursor {
+            ctx.push(escaped_style.reverse().apply(disp));
+        } else {
+            ctx.push(escaped_style.apply(disp));
+        }
+    } else if ctx.is_selection() {
+        ctx.push(sel_style.apply(g.into()));
+    } else if ctx.is_cursor {
+        ctx.push(ctx.token_style.reverse().apply(g.into()));
+    } else {
+        ctx.push(ctx.token_style.apply(g.into()));
     }
 }
 
@@ -128,11 +210,8 @@ impl App {
         let current_pane = &self.current_pane();
         let now = Instant::now();
         let content = &current_pane.content;
-        let tab_width = current_pane.settings.tab_width;
-        let primary_cursor_line = current_pane.cursors.primary().current_line_number(content);
+        let primary_cursor_offset = current_pane.cursors.primary().offset;
         let default_style = ContentStyle::new().with(DEFAULT_FG).on(DEFAULT_BG);
-        let sel_style = ContentStyle::new().with(SELECTION_FG).on(SELECTION_BG);
-        let escaped_style = ContentStyle::new().with(DEFAULT_FG).on(BLUEISH);
         let lineno_style = ContentStyle::new().with(LIGHT_GREY).on(LIGHTER_BG);
 
         macro_rules! peek {
@@ -175,7 +254,6 @@ impl App {
         };
 
         let mut byte_offset = ByteOffset(0);
-        let mut n_selections = 0;
 
         let last_visible_lineno = current_pane.viewport_position_row + current_pane.viewport_height as usize;
         let max_lineno_width = {
@@ -187,6 +265,18 @@ impl App {
             }
             w
         };
+
+        let mut ctx = RenderingContext {
+            is_cursor: false,
+            n_selections: 0,
+            current_column: 0,
+            visible_from_column: 0,
+            available_columns: (wsize.columns as usize).saturating_sub(max_lineno_width + 2),
+            tab_width: self.current_pane().settings.tab_width,
+            token_style: default_style,
+            queue: vec![],
+        };
+
         for (lineno, line) in content.lines().enumerate() {
             if lineno > last_visible_lineno {
                 break
@@ -197,163 +287,66 @@ impl App {
                 for _ in hl.highlight(&line) {}
                 continue
             }
-
-            let (visible_from, visible_to) = {
-                let available_columns = (wsize.columns as usize).saturating_sub(max_lineno_width + 2);
-                if UnicodeWidthStr::width(line.as_str()) > available_columns {
-                    let primary_cursor = current_pane.cursors.primary();
-                    if lineno == primary_cursor_line {
-                        let visible_upto_global_offset = content.next_boundary_from(primary_cursor.offset).unwrap_or_else(|| ByteOffset(content.len_bytes()));
-                        let visible_upto = visible_upto_global_offset.0 - byte_offset.0;
-                        let mut required_columns = UnicodeWidthStr::width(&line[0..visible_upto]);
-                        if required_columns > available_columns {
-                            let mut visible_from = byte_offset;
-                            for g in line.graphemes(true) {
-                                if required_columns < available_columns {
-                                    break
-                                }
-                                required_columns -= UnicodeWidthStr::width(g);
-                                visible_from.0 += g.len();
-                            }
-                            (visible_from, visible_upto_global_offset)
-                        } else {
-                            let visible_upto = {
-                                let mut width = 0;
-                                let mut len_bytes = 0;
-                                for g in line.graphemes(true) {
-                                    width += UnicodeWidthStr::width(g);
-                                    if width <= available_columns {
-                                        len_bytes += g.len();
-                                    } else {
-                                        break
-                                    }
-                                }
-                                ByteOffset(byte_offset.0 + len_bytes)
-                            };
-                            (ByteOffset(0), visible_upto)
-                        }
-                    } else {
-                        let visible_upto = {
-                            let mut width = 0;
-                            let mut len_bytes = 0;
-                            for g in line.graphemes(true) {
-                                width += UnicodeWidthStr::width(g);
-                                if width <= available_columns {
-                                    len_bytes += g.len();
-                                } else {
-                                    break
-                                }
-                            }
-                            ByteOffset(byte_offset.0 + len_bytes)
-                        };
-                        (ByteOffset(0), visible_upto)
-                    }
-                } else {
-                    (ByteOffset(0), ByteOffset::MAX)
-                }
-            };
-
-            let console_row = (lineno - current_pane.viewport_position_row) as u16;
-            writer.queue(MoveTo(0, console_row))?;
-            let left_scroll_indicator = if visible_from > byte_offset { '<' } else { ' ' };
-            let sidebar = format!(" {:width$}{}", 1 + lineno, left_scroll_indicator, width=max_lineno_width);
-            writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
+            ctx.visible_from_column = 0;
+            ctx.current_column = 0;
 
             for (style, s) in hl.highlight(&line) {
-                let xtyle = to_crossterm_style(style);
-                // visual_column = None means it's currently unknown
-                let mut visual_column = Some(0);
+                ctx.token_style = to_crossterm_style(style);
                 for g in s.graphemes(true) {
-                    let mut is_cursor = false;
+                    ctx.is_cursor = false;
                     while peek!(curs) <= byte_offset {
                         match curs.peek() {
-                            Some(Cur::Start(_)) => n_selections += 1,
-                            Some(Cur::End(_)) => n_selections -= 1,
+                            Some(Cur::Start(_)) => ctx.n_selections += 1,
+                            Some(Cur::End(_)) => ctx.n_selections -= 1,
                             Some(Cur::NoSelection(b)) if b == &byte_offset => {
-                                is_cursor = true;
+                                ctx.is_cursor = true;
                             }
                             _ => {}
                         }
                         curs.next();
                     }
-                    if byte_offset < visible_from {
-                        byte_offset.0 += g.len();
-                        continue
+                    grapheme_representation(g, &mut ctx);
+                    if byte_offset == primary_cursor_offset {
+                        let required_columns = ctx.current_column;
+                        ctx.visible_from_column = required_columns.saturating_sub(ctx.available_columns.saturating_sub(1));
                     }
-                    if byte_offset >= visible_to {
-                        byte_offset.0 += g.len();
-                        continue
-                    }
-                    if g == "\t" {
-                        // '\t' is variable width depending on current column!
-                        let tab_width = match visual_column {
-                            Some(n) => tab_width - (n % tab_width),
-                            None => match crossterm::cursor::position() {
-                                Ok((col, _row)) => {
-                                    let cur_col = (col as usize).saturating_sub(sidebar.len());
-                                    visual_column.replace(cur_col);
-                                    tab_width - (cur_col % tab_width)
-                                }
-                                Err(_) => tab_width
-                            }
-                        };
-                        if n_selections > 0 {
-                            writer.queue(PrintStyledContent(sel_style.apply(" ".repeat(tab_width))))?;
-                        } else if is_cursor {
-                            // when cursor is placed before '\t' only show one space as cursor
-                            // rather than the full width of the tab
-                            writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
-                            writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width - 1))))?;
-                        } else {
-                            writer.queue(PrintStyledContent(xtyle.apply(" ".repeat(tab_width))))?;
-                        }
-                        visual_column = visual_column.map(|offset| offset + tab_width);
-                    } else if let Some(glyph) = unicode_line_break_symbol(g) {
-                        if n_selections > 0 {
-                            writer.queue(PrintStyledContent(sel_style.with(BLUEISH).apply(glyph)))?;
-                        } else if is_cursor {
-                            writer.queue(PrintStyledContent(xtyle.reverse().apply(" ")))?;
-                        }
-                    } else if g.len() == 1 && g.chars().next().is_some_and(|c| c.is_control()) {
-                        let c = g.chars().next().unwrap();
-                        let disp = format!("<{:02}>", c as u32);
-                        let style =
-                            if n_selections > 0 {
-                                sel_style.with(BLUEISH)
-                            } else if is_cursor {
-                                escaped_style.reverse()
-                            } else {
-                                escaped_style
-                            };
-                        writer.queue(PrintStyledContent(style.apply(disp)))?;
-                        visual_column = visual_column.map(|offset| offset + 4);
-                    } else {
-                        let styled =
-                            if n_selections > 0 {
-                                sel_style.apply(g)
-                            } else if is_cursor {
-                                xtyle.reverse().apply(g)
-                            } else {
-                                xtyle.apply(g)
-                            };
-                        writer.queue(PrintStyledContent(styled))?;
-                        if g.len() == 1 {
-                            visual_column = visual_column.map(|offset| offset + 1);
-                        } else {
-                            visual_column = None;
-                        }
-                    }
-
                     byte_offset.0 += g.len();
                 }
-                writer.queue(crossterm::style::SetStyle(default_style))?;
-                writer.queue(Clear(ClearType::UntilNewLine))?;
             }
-        }
 
-        // render cursor at the end of the file
-        if curs.peek().is_some() {
-            writer.queue(PrintStyledContent(default_style.negative().apply(" ")))?;
+            // render cursor at the end of the file
+            if !line.ends_with('\n') && byte_offset == primary_cursor_offset && !self.current_pane().cursors.primary().has_selection() {
+                ctx.is_cursor = true;
+                let required_columns = ctx.current_column + 1;
+                ctx.visible_from_column = required_columns.saturating_sub(ctx.available_columns.saturating_sub(1));
+                grapheme_representation(" ", &mut ctx);
+            }
+            // render line numbers
+            let console_row = (lineno - current_pane.viewport_position_row) as u16;
+            writer.queue(MoveTo(0, console_row))?;
+            let left_scroll_indicator = if ctx.visible_from_column > 0 { '<' } else { ' ' };
+            let sidebar = format!(" {:width$}{}", 1 + lineno, left_scroll_indicator, width=max_lineno_width);
+            writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
+    
+            // render visible segment of the current line
+            let mut current_column = 0;
+            for (s_start, width, s) in ctx.queue.drain(..) {
+                if s_start < ctx.visible_from_column {
+                    continue
+                }
+                if current_column + width <= ctx.available_columns {
+                    writer.queue(PrintStyledContent(s))?;
+                    current_column += width;
+                } else {
+                    writer.queue(MoveTo(wsize.columns.saturating_sub(1), console_row))?;
+                    writer.queue(PrintStyledContent(lineno_style.apply(">")))?;
+                    break
+                }
+            }
+    
+            // clear rest
+            writer.queue(crossterm::style::SetStyle(default_style))?;
+            writer.queue(Clear(ClearType::UntilNewLine))?;
         }
 
         writer.queue(crossterm::style::SetStyle(default_style))?;
