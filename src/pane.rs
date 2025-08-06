@@ -166,7 +166,7 @@ impl Pane {
             ($fmtmsg:expr) => {self.info.replace(format!($fmtmsg))}
         }
 
-        let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).open(&path) {
+        let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(true).open(&path) {
             Ok(file) => file,
             Err(err) => {
                 status_msg!("Unable to save: {err}");
