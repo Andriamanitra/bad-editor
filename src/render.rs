@@ -152,8 +152,11 @@ const LIGHT_GREY: Color = Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa };
 const LIGHTER_BG: Color = Color::Rgb { r: 0x24, g: 0x24, b: 0x24 };
 
 impl App {
-    fn status_line_text_left(&self) -> &str {
-        &self.current_pane().title
+    fn status_line_text_left(&self) -> String {
+        match self.current_pane().modified {
+            true => format!("{} [+]", &self.current_pane().title),
+            false => self.current_pane().title.to_string(),
+        }
     }
 
     fn status_line_text_right(&self) -> String {
@@ -327,7 +330,7 @@ impl App {
             let left_scroll_indicator = if ctx.visible_from_column > 0 { '<' } else { ' ' };
             let sidebar = format!(" {:width$}{}", 1 + lineno, left_scroll_indicator, width=max_lineno_width);
             writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
-    
+
             // render visible segment of the current line
             let mut current_column = 0;
             for (s_start, width, s) in ctx.queue.drain(..) {
@@ -343,7 +346,7 @@ impl App {
                     break
                 }
             }
-    
+
             // clear rest
             writer.queue(crossterm::style::SetStyle(default_style))?;
             writer.queue(Clear(ClearType::UntilNewLine))?;
@@ -363,7 +366,7 @@ impl App {
 
         writer.queue(MoveTo(0, wsize.rows - 1))?;
         writer.queue(Print(
-            match &self.info {
+            match self.status_msg() {
                 Some(info) => format!("{:.width$}", &info, width = wsize.columns as usize),
                 None => format!("render took {:.3?}", now.elapsed()),
             }

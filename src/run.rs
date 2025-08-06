@@ -90,6 +90,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('c') if ctrl => Action::Copy,
                 KeyCode::Char('v') if ctrl => Action::Paste,
                 KeyCode::Char('a') if ctrl => Action::HandledByPane(PaneAction::SelectAll),
+                KeyCode::Char('s') if ctrl => Action::HandledByPane(PaneAction::Save),
                 KeyCode::Char('M') if alt =>
                     Action::HandledByPane(PaneAction::SelectTo(MoveTarget::MatchingPair)),
                 KeyCode::Char('m') if alt =>

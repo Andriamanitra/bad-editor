@@ -13,38 +13,7 @@ use reedline::MenuBuilder;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::Action;
 use crate::PaneAction;
-
-/// Quotes strings with spaces, quotes, or control characters in them
-/// Only intended to provide visual clarity, does NOT make the path shell-safe!
-fn quote_path(s: &str) -> String {
-    if s.is_empty() {
-        return "''".to_string()
-    }
-    let mut single_quote = false;
-    let mut double_quote = false;
-    let mut space = false;
-    let mut special = false;
-    for c in s.chars() {
-        match c {
-            '\'' => single_quote = true,
-            '"' => double_quote = true,
-            ' ' => space = true,
-            _ => if c.is_whitespace() || c.is_control() { special = true }
-        }
-    }
-    if !special {
-        if !single_quote && !double_quote && !space {
-            return s.to_string()
-        }
-        if !single_quote {
-            return format!("'{s}'")
-        }
-        if !double_quote {
-            return format!("\"{s}\"")
-        }
-    }
-    format!("{s:?}")
-}
+use crate::quote_path;
 
 fn parse_insertchar(s: &str) -> Option<char> {
     if let Some(s_hexadecimal) = s.strip_prefix("U+") {
@@ -96,6 +65,13 @@ impl crate::bad::App {
                         });
                     }
                 }
+                "save" => {
+                    if arg.is_empty() {
+                        self.enqueue(Action::HandledByPane(PaneAction::Save));
+                    } else {
+                        self.enqueue(Action::HandledByPane(PaneAction::SaveAs(arg.into())));
+                    }
+                }
                 _ => self.inform(format!("Unknown command '{command}'")),
             }
         }
@@ -142,6 +118,7 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
         "find".into(),
         "insertchar".into(),
         "open".into(),
+        "save".into(),
         "quit".into(),
     ];
 

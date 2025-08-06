@@ -330,6 +330,15 @@ impl RopeBuffer {
     pub fn lines(&self) -> ropey::iter::Lines<'_> {
         self.rope.lines()
     }
+
+    pub fn write_to<W: std::io::Write>(&self, mut writer: W) -> std::io::Result<usize> {
+        let mut bytes_written = 0;
+        for chunk in self.rope.chunks() {
+            writer.write_all(chunk.as_bytes())?;
+            bytes_written += chunk.len();
+        }
+        Ok(bytes_written)
+    }
 }
 
 impl Display for RopeBuffer {

@@ -58,3 +58,35 @@ pub enum MoveTarget {
     NextWordBoundaryRight,
     MatchingPair,
 }
+
+/// Quotes strings with spaces, quotes, or control characters in them
+/// Only intended to provide visual clarity, does NOT make the path shell-safe!
+pub fn quote_path(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string()
+    }
+    let mut single_quote = false;
+    let mut double_quote = false;
+    let mut space = false;
+    let mut special = false;
+    for c in s.chars() {
+        match c {
+            '\'' => single_quote = true,
+            '"' => double_quote = true,
+            ' ' => space = true,
+            _ => if c.is_whitespace() || c.is_control() { special = true }
+        }
+    }
+    if !special {
+        if !single_quote && !double_quote && !space {
+            return s.to_string()
+        }
+        if !single_quote {
+            return format!("'{s}'")
+        }
+        if !double_quote {
+            return format!("\"{s}\"")
+        }
+    }
+    format!("{s:?}")
+}

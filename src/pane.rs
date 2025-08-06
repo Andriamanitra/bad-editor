@@ -29,6 +29,8 @@ pub enum PaneAction {
     RepeatFind,
     RepeatFindBackward,
     QuickAddNext,
+    Save,
+    SaveAs(PathBuf),
 }
 
 #[derive(Debug)]
@@ -102,9 +104,11 @@ pub struct Pane {
     pub(crate) viewport_position_row: usize,
     pub(crate) viewport_width: u16,
     pub(crate) viewport_height: u16,
+    pub(crate) modified: bool,
     pub(crate) cursors: MultiCursor,
     pub(crate) settings: PaneSettings,
     pub(crate) last_search: Option<String>,
+    info: Option<String>,
 }
 
 impl Pane {
@@ -121,7 +125,17 @@ impl Pane {
 
             settings: PaneSettings::default(),
             last_search: None,
+            info: None,
+            modified: false,
         }
+    }
+
+    pub fn clear_status_msg(&mut self) {
+        self.info.take();
+    }
+
+    pub fn status_msg(&self) -> Option<&str> {
+        self.info.as_ref().map(|s| s.as_ref())
     }
 
     pub fn open_file(&mut self, fileloc: &FilePathWithOptionalLocation) -> std::io::Result<()> {
@@ -145,6 +159,33 @@ impl Pane {
             self.cursors.primary_mut().move_to(&self.content, MoveTarget::Location(line_no, column_no));
         }
         Ok(())
+    }
+
+    fn save_as(&mut self, path: impl AsRef<Path>) {
+        macro_rules! status_msg {
+            ($fmtmsg:expr) => {self.info.replace(format!($fmtmsg))}
+        }
+
+        let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).open(&path) {
+            Ok(file) => file,
+            Err(err) => {
+                status_msg!("Unable to save: {err}");
+                return
+            }
+        };
+
+        self.title = path.as_ref().to_string_lossy().to_string();
+        self.path.replace(path.as_ref().into());
+        match self.content.write_to(file) {
+            Ok(n) => {
+                self.modified = false;
+                let quoted_path = crate::quote_path(&path.as_ref().to_string_lossy());
+                status_msg!("Saved {quoted_path} ({n} bytes)");
+            }
+            Err(err) => {
+                status_msg!("Unable to save: {err}");
+            }
+        }
     }
 
     pub fn selections(&self) -> Vec<String> {
@@ -176,9 +217,14 @@ impl Pane {
         }
     }
 
+    fn apply_editbatch(&mut self, edits: EditBatch) {
+        self.content.do_edits(&mut self.cursors, edits);
+        self.modified = true;
+    }
+
     pub fn insert_from_clipboard(&mut self, clips: &[String]) {
         let edits = EditBatch::insert_from_clipboard(&self.cursors, clips);
-        self.content.do_edits(&mut self.cursors, edits);
+        self.apply_editbatch(edits);
     }
 
     pub(crate) fn handle_event(&mut self, event: PaneAction) {
@@ -197,31 +243,37 @@ impl Pane {
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);
-                self.content.do_edits(&mut self.cursors, edits);
+                self.apply_editbatch(edits);
             }
             PaneAction::DeleteBackward => {
                 let edits = EditBatch::delete_backward_with_cursors(&self.cursors, &self.content);
-                self.content.do_edits(&mut self.cursors, edits);
+                self.apply_editbatch(edits);
             }
             PaneAction::DeleteForward => {
                 let edits = EditBatch::delete_forward_with_cursors(&self.cursors, &self.content);
-                self.content.do_edits(&mut self.cursors, edits);
+                self.apply_editbatch(edits);
             }
             PaneAction::DeleteWord => {
                 let edits = EditBatch::delete_word_with_cursors(&self.cursors, &self.content);
-                self.content.do_edits(&mut self.cursors, edits);
+                self.apply_editbatch(edits);
             }
             PaneAction::Indent => {
                 let indent = self.settings.indent_as_string();
                 let edits = EditBatch::indent_with_cursors(&self.cursors, &self.content, &indent);
-                self.content.do_edits(&mut self.cursors, edits);
+                self.apply_editbatch(edits);
             }
             PaneAction::Dedent => {
                 let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_width, self.settings.tab_width);
-                self.content.do_edits(&mut self.cursors, edits);
+                self.apply_editbatch(edits);
             }
-            PaneAction::Undo => self.cursors = self.content.undo(self.cursors.clone()),
-            PaneAction::Redo => self.cursors = self.content.redo(self.cursors.clone()),
+            PaneAction::Undo => {
+                self.cursors = self.content.undo(self.cursors.clone());
+                self.modified = true;
+            }
+            PaneAction::Redo => {
+                self.cursors = self.content.redo(self.cursors.clone());
+                self.modified = true;
+            }
             PaneAction::Find(needle) => {
                 self.content.search_with_cursors(&mut self.cursors, &needle);
                 self.last_search = Some(needle);
@@ -247,6 +299,17 @@ impl Pane {
                         }
                     }
                 }
+            }
+            PaneAction::Save => {
+                if let Some(path) = self.path.take() {
+                    self.save_as(&path);
+                    self.path.replace(path);
+                } else {
+                    self.info.replace("Unable to save: no path specified".into());
+                }
+            }
+            PaneAction::SaveAs(path) => {
+                self.save_as(path);
             }
         }
     }

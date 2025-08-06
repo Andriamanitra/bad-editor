@@ -14,11 +14,11 @@ pub(crate) enum AppState {
 pub struct App {
     pub(crate) panes: Vec<Pane>,
     pub(crate) current_pane_index: usize,
-    pub(crate) info: Option<String>,
     pub(crate) state: AppState,
     pub(crate) action_queue: VecDeque<Action>,
     pub(crate) highlighting: BadHighlighterManager,
     pub(crate) clipboard: Clipboard,
+    info: Option<String>,
 }
 
 impl App {
@@ -33,6 +33,16 @@ impl App {
             action_queue: VecDeque::new(),
             highlighting: BadHighlighterManager::new(),
             clipboard: Clipboard::new(),
+        }
+    }
+
+    pub fn status_msg(&self) -> Option<&str> {
+        match self.current_pane().status_msg() {
+            Some(ref msg) => Some(msg),
+            None => match self.info {
+                Some(ref msg) => Some(msg),
+                None => None
+            }
         }
     }
 
@@ -61,6 +71,7 @@ impl App {
             Action::Quit => (),
             Action::Esc => {
                 self.current_pane_mut().cursors.esc();
+                self.current_pane_mut().clear_status_msg();
                 self.info.take();
             }
             Action::CommandPrompt => {
