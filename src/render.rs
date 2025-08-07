@@ -318,7 +318,8 @@ impl App {
             }
 
             // render cursor at the end of the file
-            if !line.ends_with('\n') && byte_offset == primary_cursor_offset && !self.current_pane().cursors.primary().has_selection() {
+            if lineno + 1 >= content.len_lines() && !ctx.is_selection()
+            && matches!(curs.peek(), Some(Cur::NoSelection(_))) {
                 ctx.is_cursor = true;
                 let required_columns = ctx.current_column + 1;
                 ctx.visible_from_column = required_columns.saturating_sub(ctx.available_columns.saturating_sub(1));
