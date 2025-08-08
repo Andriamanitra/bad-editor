@@ -39,6 +39,7 @@ impl crate::bad::App {
                 "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
                 "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
                 "lint" => {
+                    self.current_pane_mut().lints.clear();
                     // TODO: pick linter based on file type
                     match crate::linter::run_linter_command("rust") {
                         Ok(lints_by_filename) => {
