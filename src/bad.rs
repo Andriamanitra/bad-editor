@@ -70,8 +70,7 @@ impl App {
             Action::None => (),
             Action::Quit => (),
             Action::Esc => {
-                self.current_pane_mut().cursors.esc();
-                self.current_pane_mut().clear_status_msg();
+                self.current_pane_mut().esc();
                 self.info.take();
             }
             Action::CommandPrompt => {

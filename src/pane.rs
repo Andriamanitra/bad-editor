@@ -11,6 +11,7 @@ use crate::ByteOffset;
 use crate::IndentKind;
 use crate::MoveTarget;
 use crate::MultiCursor;
+use crate::linter::Lint;
 
 #[derive(Debug, Clone)]
 pub enum PaneAction {
@@ -108,6 +109,7 @@ pub struct Pane {
     pub(crate) cursors: MultiCursor,
     pub(crate) settings: PaneSettings,
     pub(crate) last_search: Option<String>,
+    pub(crate) lints: Vec<Lint>,
     info: Option<String>,
 }
 
@@ -125,9 +127,19 @@ impl Pane {
 
             settings: PaneSettings::default(),
             last_search: None,
+            lints: vec![],
             info: None,
             modified: false,
         }
+    }
+
+    pub fn esc(&mut self) {
+        if self.cursors.cursor_count() > 1 || self.cursors.primary().has_selection() {
+            self.cursors.esc();
+        } else {
+            self.lints.clear();
+        }
+        self.clear_status_msg();
     }
 
     pub fn clear_status_msg(&mut self) {
@@ -153,6 +165,7 @@ impl Pane {
         self.path = Some(PathBuf::from(&fileloc.path));
         self.content = content;
         self.cursors = MultiCursor::new();
+        self.lints.clear();
         self.settings = PaneSettings::from_editorconfig(&fileloc.path);
         if let Some(line_no) = fileloc.line {
             let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());

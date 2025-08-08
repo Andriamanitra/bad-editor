@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use crossterm::{
     cursor::MoveTo,
+    cursor::MoveToNextLine,
     style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
     QueueableCommand,
@@ -214,6 +215,7 @@ impl App {
         let now = Instant::now();
         let content = &current_pane.content;
         let primary_cursor_offset = current_pane.cursors.primary().offset;
+        let primary_cursor_span = current_pane.cursors.primary().line_span(content);
         let default_style = ContentStyle::new().with(DEFAULT_FG).on(DEFAULT_BG);
         let lineno_style = ContentStyle::new().with(LIGHT_GREY).on(LIGHTER_BG);
 
@@ -258,7 +260,7 @@ impl App {
 
         let mut byte_offset = ByteOffset(0);
 
-        let last_visible_lineno = current_pane.viewport_position_row + current_pane.viewport_height as usize;
+        let mut last_visible_lineno = current_pane.viewport_position_row + current_pane.viewport_height as usize;
         let max_lineno_width = {
             let mut n = content.len_lines();
             let mut w = 1;
@@ -280,6 +282,8 @@ impl App {
             queue: vec![],
         };
 
+        let mut console_row: u16 = 0;
+        writer.queue(MoveTo(0, 0))?;
         for (lineno, line) in content.lines().enumerate() {
             if lineno > last_visible_lineno {
                 break
@@ -326,11 +330,18 @@ impl App {
                 grapheme_representation(" ", &mut ctx);
             }
             // render line numbers
-            let console_row = (lineno - current_pane.viewport_position_row) as u16;
-            writer.queue(MoveTo(0, console_row))?;
-            let left_scroll_indicator = if ctx.visible_from_column > 0 { '<' } else { ' ' };
-            let sidebar = format!(" {:width$}{}", 1 + lineno, left_scroll_indicator, width=max_lineno_width);
-            writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
+            {
+                let left_scroll_indicator = if ctx.visible_from_column > 0 { '<' } else { ' ' };
+                let sidebar = format!(" {:width$}{}", 1 + lineno, left_scroll_indicator, width=max_lineno_width);
+                let mut lineno_style = lineno_style;
+                if current_pane.lints.iter().any(|lint| lint.lineno == lineno) {
+                    let lints = current_pane.lints.iter().filter(|l| l.lineno == lineno);
+                    for lint in lints {
+                        lineno_style = lineno_style.with(lint.color());
+                    }
+                }
+                writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
+            }
 
             // render visible segment of the current line
             let mut current_column = 0;
@@ -351,6 +362,22 @@ impl App {
             // clear rest
             writer.queue(crossterm::style::SetStyle(default_style))?;
             writer.queue(Clear(ClearType::UntilNewLine))?;
+            writer.queue(MoveToNextLine(1))?;
+            console_row += 1;
+
+            // render possible lints
+            if primary_cursor_span.contains(&lineno) && current_pane.lints.iter().any(|lint| lint.lineno == lineno) {
+                let lints = current_pane.lints.iter().filter(|l| l.lineno == lineno);
+                for lint in lints {
+                    writer.queue(PrintStyledContent(ContentStyle::new().on(lint.color()).apply(" ".repeat(max_lineno_width + 2))))?;
+                    writer.queue(PrintStyledContent(default_style.on(LIGHTER_BG).apply(&lint.message)))?;
+                    writer.queue(crossterm::style::SetStyle(default_style.on(LIGHTER_BG)))?;
+                    writer.queue(Clear(ClearType::UntilNewLine))?;
+                    writer.queue(MoveToNextLine(1))?;
+                    console_row += 1;
+                    last_visible_lineno = last_visible_lineno.saturating_sub(1);
+                }
+            }
         }
 
         writer.queue(crossterm::style::SetStyle(default_style))?;

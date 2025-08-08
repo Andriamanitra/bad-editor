@@ -38,6 +38,22 @@ impl crate::bad::App {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
                 "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
+                "lint" => {
+                    // TODO: pick linter based on file type
+                    match crate::linter::run_linter_command("rust") {
+                        Ok(lints_by_filename) => {
+                            // TODO: add lints for panes other than the current one
+                            for (fname, lints) in lints_by_filename.into_iter() {
+                                if self.current_pane().path.as_ref().is_some_and(|p| p == &fname) {
+                                    self.current_pane_mut().lints = lints;
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            self.inform(format!("linter error: {err:?}"));
+                        }
+                    }
+                }
                 "insertchar" | "c" => {
                     let mut out = String::new();
                     let mut success = true;

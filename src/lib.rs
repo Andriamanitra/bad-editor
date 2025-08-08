@@ -5,6 +5,7 @@ mod render;
 mod run;
 mod editing;
 mod cursor;
+mod linter;
 mod rope_ext;
 mod highlighter;
 mod ropebuffer;
