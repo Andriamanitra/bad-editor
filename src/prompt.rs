@@ -62,7 +62,7 @@ impl crate::bad::App {
                             out.push(c);
                         } else {
                             success = false;
-                            self.inform(format!("No character with name {:?}", req));
+                            self.inform(format!("No character with name {req:?}"));
                             break
                         }
                     }

@@ -38,9 +38,9 @@ impl App {
 
     pub fn status_msg(&self) -> Option<&str> {
         match self.current_pane().status_msg() {
-            Some(ref msg) => Some(msg),
-            None => match self.info {
-                Some(ref msg) => Some(msg),
+            Some(msg) => Some(msg),
+            None => match self.info.as_ref() {
+                Some(msg) => Some(msg),
                 None => None
             }
         }
