@@ -256,18 +256,30 @@ impl Pane {
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                }
                 self.apply_editbatch(edits);
             }
             PaneAction::DeleteBackward => {
                 let edits = EditBatch::delete_backward_with_cursors(&self.cursors, &self.content);
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                }
                 self.apply_editbatch(edits);
             }
             PaneAction::DeleteForward => {
                 let edits = EditBatch::delete_forward_with_cursors(&self.cursors, &self.content);
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                }
                 self.apply_editbatch(edits);
             }
             PaneAction::DeleteWord => {
                 let edits = EditBatch::delete_word_with_cursors(&self.cursors, &self.content);
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                }
                 self.apply_editbatch(edits);
             }
             PaneAction::Indent => {

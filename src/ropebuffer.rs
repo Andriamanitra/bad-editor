@@ -181,18 +181,32 @@ impl RopeBuffer {
         let inverted = self.inverse_of(&edits);
         self.undo.push((inverted, cursors_before_edits));
         for cursor in cursors.iter_mut() {
-            cursor.deselect();
             let original_offset = cursor.offset;
+            let original_sel = cursor.selection_from;
             for edit in edits.iter() {
                 match edit {
                     Edit::Insert(offset, rope) => {
                         if offset <= &original_offset {
                             cursor.offset.0 += rope.len_bytes();
                         }
+                        if let Some(sel) = original_sel {
+                            if offset <= &sel {
+                                for sel_offset in cursor.selection_from.iter_mut() {
+                                    sel_offset.0 += rope.len_bytes();
+                                }
+                            }
+                        }
                     }
                     Edit::Delete(range) => {
                         if range.start <= original_offset {
                             cursor.offset.0 -= range.end.0.min(original_offset.0) - range.start.0;
+                        }
+                        if let Some(sel) = original_sel {
+                            if range.start <= sel {
+                                for sel_offset in cursor.selection_from.iter_mut() {
+                                    sel_offset.0 -= range.end.0.min(sel.0) - range.start.0;
+                                }
+                            }
                         }
                     }
                 }
