@@ -189,11 +189,9 @@ impl RopeBuffer {
                         if offset <= &original_offset {
                             cursor.offset.0 += rope.len_bytes();
                         }
-                        if let Some(sel) = original_sel {
-                            if offset <= &sel {
-                                for sel_offset in cursor.selection_from.iter_mut() {
-                                    sel_offset.0 += rope.len_bytes();
-                                }
+                        if original_sel.is_some_and(|sel| offset <= &sel) {
+                            for sel_offset in cursor.selection_from.iter_mut() {
+                                sel_offset.0 += rope.len_bytes();
                             }
                         }
                     }
