@@ -167,6 +167,53 @@ impl EditBatch {
 
         Self::from_edits(edits)
     }
+
+    pub fn move_lines_up(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
+        // FIXME: moving line without a trailing newline
+        // eg. "A\nB" should become "B\nA\n" instead of "BA\n"
+        let mut edits = vec![];
+
+        for span in cursors.line_ranges(content).iter().rev() {
+            // moving line span up is equivalent to moving the *previous line down*,
+            // and if we do it that way it's easier to keep the cursors in right places
+            if span.start > 0 {
+                let prev_line = content.line_to_byte(span.start - 1) .. content.line_to_byte(span.start);
+                let end = content.line_to_byte(span.end);
+                edits.push(Edit::Insert(end, content.slice(&prev_line).into()));
+                edits.push(Edit::Delete(prev_line));
+            }
+        }
+
+        Self::from_edits(edits)
+    }
+
+    pub fn move_lines_down(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
+        // FIXME: moving line without a trailing newline
+        // eg. "A\nB" should become "B\nA\n" instead of "BA\n"
+        let mut edits = vec![];
+
+        for span in cursors.line_ranges(content).iter().rev() {
+            // moving line span down is equivalent to moving the *next line *up*,
+            // and if we do it that way it's easier to keep the cursors in right places
+            let next_line =
+                if span.end < content.len_lines() {
+                    let next_line_start = content.line_to_byte(span.end);
+                    let next_line_end = content.line_to_byte(span.end + 1);
+                    if next_line_start < next_line_end {
+                        edits.push(Edit::Delete(next_line_start .. next_line_end));
+                        content.slice(&(next_line_start .. next_line_end)).into()
+                    } else {
+                        Rope::from("\n")
+                    }
+                } else {
+                    Rope::from("\n")
+                };
+            let start = content.line_to_byte(span.start);
+            edits.push(Edit::Insert(start, next_line));
+        }
+
+        Self::from_edits(edits)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

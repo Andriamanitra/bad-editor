@@ -24,6 +24,8 @@ pub enum PaneAction {
     DeleteWord,
     Indent,
     Dedent,
+    MoveLinesUp,
+    MoveLinesDown,
     Undo,
     Redo,
     Find(String),
@@ -289,6 +291,14 @@ impl Pane {
             }
             PaneAction::Dedent => {
                 let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_width, self.settings.tab_width);
+                self.apply_editbatch(edits);
+            }
+            PaneAction::MoveLinesUp => {
+                let edits = EditBatch::move_lines_up(&self.cursors, &self.content);
+                self.apply_editbatch(edits);
+            }
+            PaneAction::MoveLinesDown => {
+                let edits = EditBatch::move_lines_down(&self.cursors, &self.content);
                 self.apply_editbatch(edits);
             }
             PaneAction::Undo => {

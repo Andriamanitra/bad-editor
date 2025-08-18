@@ -97,11 +97,15 @@ pub fn get_action(ev: &event::Event) -> Action {
                     Action::HandledByPane(PaneAction::MoveTo(MoveTarget::MatchingPair)),
                 KeyCode::Char(c) if only_shift => Action::HandledByPane(PaneAction::Insert(c.to_string())),
                 KeyCode::Up =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(1))) },
+                    if alt && shift { Action::None }
+                    else if alt     { Action::HandledByPane(PaneAction::MoveLinesUp) }
+                    else if shift   { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Up(1))) }
+                    else            { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(1))) },
                 KeyCode::Down =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Down(1))) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(1))) },
+                    if alt && shift { Action::None }
+                    else if alt     { Action::HandledByPane(PaneAction::MoveLinesDown) }
+                    else if shift   { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Down(1))) }
+                    else            { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(1))) },
                 KeyCode::Left => {
                     let target = if ctrl { MoveTarget::NextWordBoundaryLeft } else { MoveTarget::Left(1) };
                     if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }

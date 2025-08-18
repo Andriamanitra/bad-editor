@@ -77,6 +77,23 @@ impl MultiCursor {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Cursor> {
         self.cursors.iter_mut()
     }
+
+    pub fn line_ranges(&self, content: &RopeBuffer) -> Vec<Range<usize>> {
+        let mut line_spans: Vec<_> = self.cursors.iter().map(|cursor| cursor.line_span(content)).collect();
+        line_spans.sort_unstable_by_key(|span| span.start);
+        let mut merged_spans: Vec<Range<usize>> = Vec::with_capacity(line_spans.len());
+        for span in line_spans {
+            match merged_spans.last_mut() {
+                Some(last) if last.end >= span.start => {
+                    last.end = last.end.max(span.end);
+                }
+                Some(_) | None => {
+                    merged_spans.push(span);
+                }
+            }
+        }
+        merged_spans
+    }
 }
 
 impl Default for MultiCursor {
