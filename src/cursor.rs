@@ -155,6 +155,16 @@ impl Cursor {
             MoveTarget::NextWordBoundaryLeft => Some(self.word_boundary_left(content)),
             MoveTarget::NextWordBoundaryRight => Some(self.word_boundary_right(content)),
             MoveTarget::MatchingPair => self.matching_pair(content),
+            MoveTarget::ByteOffset(b) => {
+                // try to find a nearby grapheme cluster boundary to tolerate some imprecision
+                for d in 0..5 {
+                    let offset = ByteOffset(b.saturating_sub(d));
+                    if content.is_grapheme_cluster_boundary(offset) {
+                        return Some(offset)
+                    }
+                }
+                None
+            }
             MoveTarget::Location(line_no, column_no) => {
                 let line = line_no.get() - 1;
                 let col = column_no.get() - 1;

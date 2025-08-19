@@ -70,6 +70,10 @@ impl RopeBuffer {
         self.rope.bytes_at(offset.0)
     }
 
+    pub fn is_grapheme_cluster_boundary(&self, offset: ByteOffset) -> bool {
+        self.rope.is_boundary(offset)
+    }
+
     pub fn is_word_boundary(&self, offset: ByteOffset) -> bool {
         // The unicode segmentation crates don't currently (as of August 2025) provide
         // an API for word boundaries that would be usable with Rope so we will use a

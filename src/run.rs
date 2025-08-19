@@ -19,7 +19,7 @@ impl App {
 
         let mut need_to_render = true;
         let mut wsize = crossterm::terminal::window_size()?;
-        
+
         loop {
             let frame = Instant::now();
             if need_to_render {
@@ -103,6 +103,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('z') if ctrl => Action::HandledByPane(PaneAction::Undo),
                 KeyCode::Char('y') if ctrl => Action::HandledByPane(PaneAction::Redo),
                 KeyCode::Char('f') if ctrl => Action::CommandPromptEdit("find ".into()),
+                KeyCode::Char('g') if ctrl => Action::CommandPromptEdit("goto ".into()),
                 KeyCode::Char('b') if ctrl => Action::HandledByPane(PaneAction::RepeatFindBackward),
                 KeyCode::Char('n') if ctrl => Action::HandledByPane(PaneAction::RepeatFind),
                 KeyCode::Char('d') if ctrl => Action::HandledByPane(PaneAction::QuickAddNext),

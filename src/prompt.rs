@@ -13,6 +13,7 @@ use reedline::MenuBuilder;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::Action;
 use crate::PaneAction;
+use crate::MoveTarget;
 use crate::quote_path;
 
 fn parse_insertchar(s: &str) -> Option<char> {
@@ -31,6 +32,20 @@ fn parse_insertchar(s: &str) -> Option<char> {
     }
 }
 
+fn parse_target(s: &str) -> Option<MoveTarget> {
+    if s.starts_with("B") {
+        let offset = s[1..].parse().ok()?;
+        Some(MoveTarget::ByteOffset(offset))
+    } else if let Some((line, col)) = s.split_once(":") {
+        let line = line.parse().ok()?;
+        let col = col.parse().ok()?;
+        Some(MoveTarget::Location(line, col))
+    } else {
+        let line = s.parse().ok()?;
+        Some(MoveTarget::Location(line, std::num::NonZero::<usize>::MIN))
+    }
+}
+
 impl crate::bad::App {
     pub fn command_prompt_with(&mut self, stub: Option<String>) {
         self.state = crate::bad::AppState::InPrompt;
@@ -38,6 +53,13 @@ impl crate::bad::App {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
                 "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
+                "goto" => {
+                    if let Some(target) = parse_target(&arg) {
+                        self.enqueue(Action::HandledByPane(PaneAction::MoveTo(target)));
+                    } else {
+                        self.inform(format!("goto error: {arg:?} is not a valid target"));
+                    }
+                }
                 "lint" => {
                     self.current_pane_mut().lints.clear();
                     // TODO: pick linter based on file type
@@ -133,6 +155,7 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
     let commands = vec![
         "exit".into(),
         "find".into(),
+        "goto".into(),
         "insertchar".into(),
         "open".into(),
         "save".into(),

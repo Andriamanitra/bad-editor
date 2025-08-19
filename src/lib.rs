@@ -52,6 +52,7 @@ pub enum MoveTarget {
     Left(usize),
     Right(usize),
     Location(NonZeroUsize, NonZeroUsize),
+    ByteOffset(usize),
     Start,
     End,
     StartOfLine,

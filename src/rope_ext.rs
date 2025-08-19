@@ -7,6 +7,7 @@ pub trait RopeExt<'a> {
     fn count_grapheme_clusters(&'a self) -> usize;
     fn next_boundary_from(&'a self, start: ByteOffset) -> Option<ByteOffset>;
     fn previous_boundary_from(&'a self, start: ByteOffset) -> Option<ByteOffset>;
+    fn is_boundary(&'a self, offset: ByteOffset) -> bool;
 }
 
 impl<'a> RopeExt<'a> for ropey::RopeSlice<'a> {
@@ -67,6 +68,29 @@ impl<'a> RopeExt<'a> for ropey::RopeSlice<'a> {
             }
         }
     }
+
+    fn is_boundary(&self, offset: ByteOffset) -> bool {
+        if offset.0 > self.len_bytes() {
+            return false
+        }
+        if offset.0 != self.char_to_byte(self.byte_to_char(offset.0)) {
+            return false
+        }
+        let mut gr = GraphemeCursor::new(offset.0, self.len_bytes(), true);
+        let (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(offset.0);
+        for _ in 0..5 {
+            match gr.is_boundary(chunk, chunk_byte_idx) {
+                Ok(is_boundary) => return is_boundary,
+                Err(GraphemeIncomplete::PreContext(idx)) => {
+                    let (ctx_chunk, ctx_chunk_byte_idx, _, _) =
+                        self.chunk_at_byte(idx.saturating_sub(1));
+                    gr.provide_context(ctx_chunk, ctx_chunk_byte_idx);
+                }
+                Err(err) => unreachable!("{err:?} should never happen!"),
+            }
+        }
+        false
+    }
 }
 
 impl RopeExt<'_> for ropey::Rope {
@@ -126,5 +150,28 @@ impl RopeExt<'_> for ropey::Rope {
                 Err(err) => unreachable!("{err:?} should never happen!"),
             }
         }
+    }
+
+    fn is_boundary(&self, offset: ByteOffset) -> bool {
+        if offset.0 > self.len_bytes() {
+            return false
+        }
+        if offset.0 != self.char_to_byte(self.byte_to_char(offset.0)) {
+            return false
+        }
+        let mut gr = GraphemeCursor::new(offset.0, self.len_bytes(), true);
+        let (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(offset.0);
+        for _ in 0..5 {
+            match gr.is_boundary(chunk, chunk_byte_idx) {
+                Ok(is_boundary) => return is_boundary,
+                Err(GraphemeIncomplete::PreContext(idx)) => {
+                    let (ctx_chunk, ctx_chunk_byte_idx, _, _) =
+                        self.chunk_at_byte(idx.saturating_sub(1));
+                    gr.provide_context(ctx_chunk, ctx_chunk_byte_idx);
+                }
+                Err(err) => unreachable!("{err:?} should never happen!"),
+            }
+        }
+        false
     }
 }
