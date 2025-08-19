@@ -171,9 +171,13 @@ impl Pane {
         self.cursors = MultiCursor::new();
         self.lints.clear();
         self.settings = PaneSettings::from_editorconfig(&fileloc.path);
+        self.modified = false;
         if let Some(line_no) = fileloc.line {
             let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());
             self.cursors.primary_mut().move_to(&self.content, MoveTarget::Location(line_no, column_no));
+            self.viewport_position_row = usize::from(line_no).saturating_sub(3);
+        } else {
+            self.viewport_position_row = 0;
         }
         Ok(())
     }
