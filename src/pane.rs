@@ -34,6 +34,8 @@ pub enum PaneAction {
     QuickAddNext,
     Save,
     SaveAs(PathBuf),
+    ScrollDown(usize),
+    ScrollUp(usize),
 }
 
 #[derive(Debug)]
@@ -235,6 +237,7 @@ impl Pane {
     fn apply_editbatch(&mut self, edits: EditBatch) {
         self.content.do_edits(&mut self.cursors, edits);
         self.modified = true;
+        self.adjust_viewport();
     }
 
     pub fn insert_from_clipboard(&mut self, clips: &[String]) {
@@ -246,9 +249,11 @@ impl Pane {
         match event {
             PaneAction::MoveTo(target) => {
                 self.cursors.move_to(&self.content, target);
+                self.adjust_viewport();
             }
             PaneAction::SelectTo(target) => {
                 self.cursors.select_to(&self.content, target);
+                self.adjust_viewport();
             }
             PaneAction::SelectAll => {
                 self.cursors.esc();
@@ -304,23 +309,28 @@ impl Pane {
             PaneAction::Undo => {
                 self.cursors = self.content.undo(self.cursors.clone());
                 self.modified = true;
+                self.adjust_viewport();
             }
             PaneAction::Redo => {
                 self.cursors = self.content.redo(self.cursors.clone());
                 self.modified = true;
+                self.adjust_viewport();
             }
             PaneAction::Find(needle) => {
                 self.content.search_with_cursors(&mut self.cursors, &needle);
                 self.last_search = Some(needle);
+                self.adjust_viewport();
             }
             PaneAction::RepeatFind => {
                 if let Some(last_search) = self.last_search.as_ref() {
                     self.content.search_with_cursors(&mut self.cursors, last_search);
+                    self.adjust_viewport();
                 }
             }
             PaneAction::RepeatFindBackward => {
                 if let Some(last_search) = self.last_search.as_ref() {
                     self.content.search_with_cursors_backward(&mut self.cursors, last_search);
+                    self.adjust_viewport();
                 }
             }
             PaneAction::QuickAddNext => {
@@ -333,6 +343,7 @@ impl Pane {
                             self.cursors.spawn_new_primary(new_cursor);
                         }
                     }
+                    self.adjust_viewport();
                 }
             }
             PaneAction::Save => {
@@ -345,6 +356,13 @@ impl Pane {
             }
             PaneAction::SaveAs(path) => {
                 self.save_as(path);
+            }
+            PaneAction::ScrollDown(n) => {
+                let new_pos = self.viewport_position_row + n;
+                self.viewport_position_row = new_pos.min(self.content.len_lines().saturating_sub(1));
+            }
+            PaneAction::ScrollUp(n) => {
+                self.viewport_position_row = self.viewport_position_row.saturating_sub(n);
             }
         }
     }

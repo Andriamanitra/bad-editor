@@ -7,6 +7,8 @@ use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::cursor::Hide as HideCursor;
 use crossterm::cursor::Show as ShowCursor;
 use crossterm::event::{
+    EnableMouseCapture,
+    DisableMouseCapture,
     PushKeyboardEnhancementFlags,
     PopKeyboardEnhancementFlags,
     KeyboardEnhancementFlags,
@@ -24,6 +26,7 @@ impl Drop for TerminalGuard {
         let _ = crossterm::terminal::disable_raw_mode();
         let _ = stdout().execute(ShowCursor);
         let _ = stdout().execute(PopKeyboardEnhancementFlags);
+        let _ = stdout().execute(DisableMouseCapture);
     }
 }
 
@@ -40,6 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let terminal_guard = TerminalGuard::acquire()?;
     stdout().execute(HideCursor)?;
     stdout().execute(EnterAlternateScreen)?;
+    stdout().execute(EnableMouseCapture)?;
     stdout().execute(PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
 
     app.run(&mut stdout())?;

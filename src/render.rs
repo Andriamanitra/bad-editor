@@ -190,7 +190,6 @@ impl App {
         {
             let pane = self.current_pane_mut();
             pane.update_viewport_size(wsize.columns, wsize.rows.saturating_sub(2));
-            pane.adjust_viewport();
         }
 
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
@@ -322,8 +321,10 @@ impl App {
             }
 
             // render cursor at the end of the file
-            if lineno + 1 >= content.len_lines() && !ctx.is_selection()
-            && matches!(curs.peek(), Some(Cur::NoSelection(_))) {
+            if 1 + lineno >= content.len_lines() && {
+                let content_end_offset = ByteOffset(content.len_bytes());
+                self.current_pane().cursors.iter().any(|cur| !cur.has_selection() && cur.offset == content_end_offset)
+            } {
                 ctx.is_cursor = true;
                 let required_columns = ctx.current_column + 1;
                 ctx.visible_from_column = required_columns.saturating_sub(ctx.available_columns.saturating_sub(1));

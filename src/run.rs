@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::time::{Duration, Instant};
 
-use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers, MouseEventKind};
 
 use crate::bad::App;
 use crate::{Action, PaneAction, MoveTarget};
@@ -61,9 +61,20 @@ pub fn get_action(ev: &event::Event) -> Action {
         FocusGained => Action::None,
         FocusLost => Action::None,
         Resize(_, _) => Action::None,
-        Mouse(_) => todo!(),
         // Only emitted when bracketed paste has been enabled
         Paste(s) => Action::HandledByPane(PaneAction::Insert(s)),
+        Mouse(ev) => {
+            match ev.kind {
+                MouseEventKind::ScrollUp => Action::HandledByPane(PaneAction::ScrollUp(1)),
+                MouseEventKind::ScrollDown => Action::HandledByPane(PaneAction::ScrollDown(1)),
+                MouseEventKind::Down(_) => Action::None,
+                MouseEventKind::Up(_) => Action::None,
+                MouseEventKind::Drag(_) => Action::None,
+                MouseEventKind::Moved => Action::None,
+                MouseEventKind::ScrollLeft => Action::None,
+                MouseEventKind::ScrollRight => Action::None,
+            }
+        },
         Key(
             kevent @ KeyEvent {
                 code,
