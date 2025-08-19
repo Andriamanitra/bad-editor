@@ -4,7 +4,7 @@ use crossterm::{
     cursor::MoveTo,
     cursor::MoveToNextLine,
     style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent, Stylize},
-    terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
+    terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, WindowSize},
     QueueableCommand,
 };
 use syntect::highlighting::Style as SyntectStyle;
@@ -185,15 +185,8 @@ impl App {
         )
     }
 
-    pub fn render(&mut self, mut writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        let wsize = crossterm::terminal::window_size()?;
-        {
-            let pane = self.current_pane_mut();
-            pane.update_viewport_size(wsize.columns, wsize.rows.saturating_sub(2));
-        }
-
+    pub fn render(&self, mut writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
-
         writer.queue(crossterm::cursor::Hide)?;
 
         if wsize.rows < 3 {
@@ -209,7 +202,7 @@ impl App {
         Ok(())
     }
 
-    fn render_content(&self, writer: &mut dyn std::io::Write, wsize: crossterm::terminal::WindowSize) -> std::io::Result<()> {
+    fn render_content(&self, writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
         let current_pane = &self.current_pane();
         let now = Instant::now();
         let content = &current_pane.content;

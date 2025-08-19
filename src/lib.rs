@@ -36,6 +36,7 @@ pub enum Action {
     None,
     Quit,
     Esc,
+    Resize(u16, u16),
     CommandPrompt,
     CommandPromptEdit(String),
     SetInfo(String),

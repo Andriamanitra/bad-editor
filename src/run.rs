@@ -18,14 +18,21 @@ impl App {
         const POLL_TIMEOUT: Duration = Duration::from_millis(16);
 
         let mut need_to_render = true;
+        let mut wsize = crossterm::terminal::window_size()?;
+        
         loop {
             let frame = Instant::now();
             if need_to_render {
-                self.render(&mut out)?;
+                self.current_pane_mut().update_viewport_size(wsize.columns, wsize.rows.saturating_sub(2));
+                self.render(&mut out, &wsize)?;
             }
             while crossterm::event::poll(POLL_TIMEOUT.saturating_sub(frame.elapsed()))? {
                 let event = crossterm::event::read()?;
                 let action = get_action(&event);
+                if let Action::Resize(columns, rows) = action {
+                    wsize.columns = columns;
+                    wsize.rows = rows;
+                }
                 self.enqueue(action);
             }
             match self.process_queued_actions() {
@@ -45,6 +52,7 @@ impl App {
         while let Some(action) = self.action_queue.pop_front() {
             match action {
                 Action::Quit => return AfterActions::Quit,
+                Action::None => {}
                 action => {
                     after = AfterActions::Render;
                     self.handle_action(action);
@@ -60,7 +68,7 @@ pub fn get_action(ev: &event::Event) -> Action {
     match ev.to_owned() {
         FocusGained => Action::None,
         FocusLost => Action::None,
-        Resize(_, _) => Action::None,
+        Resize(columns, rows) => Action::Resize(columns, rows),
         // Only emitted when bracketed paste has been enabled
         Paste(s) => Action::HandledByPane(PaneAction::Insert(s)),
         Mouse(ev) => {

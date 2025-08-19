@@ -73,6 +73,9 @@ impl App {
                 self.current_pane_mut().esc();
                 self.info.take();
             }
+            Action::Resize(_columns, _rows) => {
+                // this event is handled in App::run
+            }
             Action::CommandPrompt => {
                 self.info.take();
                 self.command_prompt_with(None);
