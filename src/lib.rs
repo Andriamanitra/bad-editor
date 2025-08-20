@@ -1,7 +1,7 @@
-pub mod bad;
 pub mod cli;
 mod prompt;
 mod render;
+mod app;
 mod run;
 mod editing;
 mod cursor;
@@ -14,6 +14,7 @@ mod clipboard;
 
 use std::num::NonZeroUsize;
 
+pub use app::App;
 pub use pane::Pane;
 pub use pane::PaneAction;
 pub use rope_ext::RopeExt;

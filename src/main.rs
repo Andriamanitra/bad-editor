@@ -1,6 +1,6 @@
 use std::io::stdout;
 
-use bad_editor::bad;
+use bad_editor::App;
 use bad_editor::cli;
 use crossterm::ExecutableCommand;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
@@ -31,7 +31,7 @@ impl Drop for TerminalGuard {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut app = bad::App::new();
+    let mut app = App::new();
 
     let args = cli::parse_cli_args();
     if let Some(file_loc) = args.get_one::<cli::FilePathWithOptionalLocation>("file") {

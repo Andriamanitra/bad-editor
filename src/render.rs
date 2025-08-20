@@ -12,7 +12,7 @@ use syntect::highlighting::FontStyle as SyntectFontStyle;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::bad::App;
+use crate::App;
 use crate::ByteOffset;
 
 fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {

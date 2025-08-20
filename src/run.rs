@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers, MouseEventKind};
 
-use crate::bad::App;
+use crate::App;
 use crate::{Action, PaneAction, MoveTarget};
 
 

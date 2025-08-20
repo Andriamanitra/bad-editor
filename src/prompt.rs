@@ -10,6 +10,8 @@ use reedline::KeyCode;
 use reedline::KeyModifiers;
 use reedline::MenuBuilder;
 
+use crate::App;
+use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::Action;
 use crate::PaneAction;
@@ -33,8 +35,8 @@ fn parse_insertchar(s: &str) -> Option<char> {
 }
 
 fn parse_target(s: &str) -> Option<MoveTarget> {
-    if s.starts_with("B") {
-        let offset = s[1..].parse().ok()?;
+    if let Some(s) = s.strip_prefix("B") {
+        let offset = s.parse().ok()?;
         Some(MoveTarget::ByteOffset(offset))
     } else if let Some((line, col)) = s.split_once(":") {
         let line = line.parse().ok()?;
@@ -46,9 +48,9 @@ fn parse_target(s: &str) -> Option<MoveTarget> {
     }
 }
 
-impl crate::bad::App {
+impl App {
     pub fn command_prompt_with(&mut self, stub: Option<String>) {
-        self.state = crate::bad::AppState::InPrompt;
+        self.state = AppState::InPrompt;
         if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
                 "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
@@ -114,7 +116,7 @@ impl crate::bad::App {
                 _ => self.inform(format!("Unknown command '{command}'")),
             }
         }
-        self.state = crate::bad::AppState::Idle;
+        self.state = AppState::Idle;
     }
 }
 
