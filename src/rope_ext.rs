@@ -1,5 +1,4 @@
-use unicode_segmentation::GraphemeCursor;
-use unicode_segmentation::GraphemeIncomplete;
+use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 use crate::ByteOffset;
 
@@ -56,8 +55,7 @@ impl<'a> RopeExt<'a> for ropey::RopeSlice<'a> {
                 Ok(Some(n)) => return Some(ByteOffset(n)),
                 Ok(None) => return None,
                 Err(GraphemeIncomplete::PrevChunk) => {
-                    (chunk, chunk_byte_idx, _, _) =
-                        self.chunk_at_byte(chunk_byte_idx - 1);
+                    (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(chunk_byte_idx - 1);
                 }
                 Err(GraphemeIncomplete::PreContext(idx)) => {
                     let (ctx_chunk, ctx_chunk_byte_idx, _, _) =
@@ -139,8 +137,7 @@ impl RopeExt<'_> for ropey::Rope {
                 Ok(Some(n)) => return Some(ByteOffset(n)),
                 Ok(None) => return None,
                 Err(GraphemeIncomplete::PrevChunk) => {
-                    (chunk, chunk_byte_idx, _, _) =
-                        self.chunk_at_byte(chunk_byte_idx - 1);
+                    (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(chunk_byte_idx - 1);
                 }
                 Err(GraphemeIncomplete::PreContext(idx)) => {
                     let (ctx_chunk, ctx_chunk_byte_idx, _, _) =

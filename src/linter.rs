@@ -58,17 +58,16 @@ pub fn run_linter_command(filetype: &str) -> Result<HashMap<Filename, Vec<Lint>>
                             [fname, line, col, msg] => {
                                 let line: usize = line.parse().ok()?;
                                 let _col: usize = col.parse().ok()?;
-                                let lint =
-                                    if msg.starts_with(" warning") {
-                                        Lint::warning(line, msg.to_string())
-                                    } else if msg.starts_with(" error") {
-                                        Lint::error(line, msg.to_string())
-                                    } else {
-                                        Lint::info(line, msg.to_string())
-                                    };
+                                let lint = if msg.starts_with(" warning") {
+                                    Lint::warning(line, msg.to_string())
+                                } else if msg.starts_with(" error") {
+                                    Lint::error(line, msg.to_string())
+                                } else {
+                                    Lint::info(line, msg.to_string())
+                                };
                                 Some((PathBuf::from(fname), lint))
                             }
-                            _ => None
+                            _ => None,
                         }
                     }
 
@@ -79,10 +78,9 @@ pub fn run_linter_command(filetype: &str) -> Result<HashMap<Filename, Vec<Lint>>
                     }
                     Ok(results)
                 }
-                Err(err) => Err(LinterError::FailedToRun(err))
+                Err(err) => Err(LinterError::FailedToRun(err)),
             }
         }
-        _ => Err(LinterError::NoLinterForFileType)
+        _ => Err(LinterError::NoLinterForFileType),
     }
-
 }

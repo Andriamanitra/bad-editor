@@ -1,27 +1,28 @@
 use std::time::Instant;
 
-use crossterm::{
-    cursor::MoveTo,
-    cursor::MoveToNextLine,
-    style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent, Stylize},
-    terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, WindowSize},
-    QueueableCommand,
+use crossterm::QueueableCommand;
+use crossterm::cursor::{MoveTo, MoveToNextLine};
+use crossterm::style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent, Stylize};
+use crossterm::terminal::{
+    BeginSynchronizedUpdate,
+    Clear,
+    ClearType,
+    EndSynchronizedUpdate,
+    WindowSize,
 };
-use syntect::highlighting::Style as SyntectStyle;
-use syntect::highlighting::FontStyle as SyntectFontStyle;
+use syntect::highlighting::{FontStyle as SyntectFontStyle, Style as SyntectStyle};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::App;
-use crate::ByteOffset;
+use crate::{App, ByteOffset};
 
 fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
     let fg = {
-        let syntect::highlighting::Color {r, g, b, ..} = syntect_style.foreground;
+        let syntect::highlighting::Color { r, g, b, .. } = syntect_style.foreground;
         Color::Rgb { r, g, b }
     };
     let bg = {
-        let syntect::highlighting::Color {r, g, b, ..} = syntect_style.background;
+        let syntect::highlighting::Color { r, g, b, .. } = syntect_style.background;
         Color::Rgb { r, g, b }
     };
     let mut style = ContentStyle::new().with(fg).on(bg);
@@ -58,17 +59,13 @@ fn unicode_line_break_symbol(grapheme_cluster: &str) -> Option<&'static str> {
         "\u{2028}" => Some("<U+2028>"),
         // PARAGRAPH SEPARATOR (U+2029)
         "\u{2029}" => Some("<U+2029>"),
-        _ => None
+        _ => None,
     }
 }
 
 fn replacement_symbol(g: &str) -> Option<String> {
     if UnicodeWidthStr::width(g) == 0 {
-        let mut s = String::new();
-        for c in g.chars() {
-            s.push_str(&format!("<U+{:X}>", c as u32));
-        }
-        return Some(s)
+        return Some(g.chars().map(|c| format!("<U+{:X}>", c as u32)).collect());
     }
     if g.len() != 1 {
         return None
@@ -90,7 +87,7 @@ struct RenderingContext {
     available_columns: usize,
     tab_width: usize,
     token_style: ContentStyle,
-    queue: Vec<(usize, usize, StyledContent<String>)>
+    queue: Vec<(usize, usize, StyledContent<String>)>,
 }
 impl RenderingContext {
     fn is_selection(&self) -> bool {
@@ -151,7 +148,7 @@ fn grapheme_representation(g: &str, ctx: &mut RenderingContext) {
     }
 }
 
-const BLUEISH: Color = Color::Rgb {  r: 0x4a, g: 0x54, b: 0x6e };
+const BLUEISH: Color = Color::Rgb { r: 0x4a, g: 0x54, b: 0x6e };
 const DEFAULT_FG: Color = Color::White;
 const DEFAULT_BG: Color = Color::Rgb { r: 0x1a, g: 0x1a, b: 0x1a };
 const SELECTION_FG: Color = Color::Black;
@@ -222,7 +219,7 @@ impl App {
             ($it:expr) => {
                 match $it.peek() {
                     Some(Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b)) => *b,
-                    None => ByteOffset::MAX
+                    None => ByteOffset::MAX,
                 }
             }
         }

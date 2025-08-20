@@ -1,15 +1,17 @@
 use std::str::FromStr;
 
 use syntect::easy::HighlightLines;
-use syntect::parsing::SyntaxSet;
 //use syntect::parsing::SyntaxSetBuilder;
 use syntect::highlighting::Color;
-use syntect::highlighting::Style;
-use syntect::highlighting::Theme;
-use syntect::highlighting::ThemeItem;
-use syntect::highlighting::ThemeSettings;
-use syntect::highlighting::ScopeSelectors;
-use syntect::highlighting::StyleModifier;
+use syntect::highlighting::{
+    ScopeSelectors,
+    Style,
+    StyleModifier,
+    Theme,
+    ThemeItem,
+    ThemeSettings,
+};
+use syntect::parsing::SyntaxSet;
 
 pub struct BadHighlighterManager {
     theme: Theme,
@@ -62,7 +64,7 @@ impl BadHighlighterManager {
                 "support.macro,entity.name.macro,keyword.declaration.macro" = "#A6E22E"
                 "meta.interpolation" = "#FFFFFF"
                 "punctuation.section" = "#D8D8D2"
-            ]
+            ],
         };
         Self { theme, syntax_set }
     }
@@ -70,13 +72,10 @@ impl BadHighlighterManager {
     pub fn highlighter_for_file<'a>(&'a self, file_path: &str) -> BadHighlighter<'a> {
         let syntax = match self.syntax_set.find_syntax_for_file(file_path) {
             Ok(Some(s)) => s,
-            _ => self.syntax_set.find_syntax_plain_text()
+            _ => self.syntax_set.find_syntax_plain_text(),
         };
         let highlighter = HighlightLines::new(syntax, &self.theme);
-        BadHighlighter {
-            ss: &self.syntax_set,
-            highlighter
-        }
+        BadHighlighter { ss: &self.syntax_set, highlighter }
     }
 }
 

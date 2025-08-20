@@ -1,10 +1,8 @@
 use std::collections::VecDeque;
 
-use crate::Action;
-use crate::Pane;
 use crate::clipboard::Clipboard;
 use crate::highlighter::BadHighlighterManager;
-
+use crate::{Action, Pane};
 
 pub(crate) enum AppState {
     Idle,
@@ -41,8 +39,8 @@ impl App {
             Some(msg) => Some(msg),
             None => match self.info.as_ref() {
                 Some(msg) => Some(msg),
-                None => None
-            }
+                None => None,
+            },
         }
     }
 

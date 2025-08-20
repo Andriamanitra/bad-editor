@@ -3,13 +3,12 @@ use std::ops::Range;
 
 use ropey::Rope;
 
-use crate::MultiCursor;
-use crate::ByteOffset;
 use crate::ropebuffer::RopeBuffer;
+use crate::{ByteOffset, MultiCursor};
 
 #[derive(Debug)]
 pub struct EditBatch {
-    edits: Vec<Edit>
+    edits: Vec<Edit>,
 }
 
 impl EditBatch {
@@ -70,7 +69,7 @@ impl EditBatch {
             match cursor.selection() {
                 Some(selection) => {
                     edits.push(Edit::Delete(selection));
-                },
+                }
                 None => {
                     let a = cursor.left(content, 1);
                     let b = cursor.offset;
@@ -114,7 +113,7 @@ impl EditBatch {
             match cursor.selection() {
                 Some(selection) => {
                     edits.push(Edit::Delete(selection));
-                },
+                }
                 None => {
                     let a = cursor.offset;
                     let b = cursor.right(content, 1);
@@ -161,7 +160,7 @@ impl EditBatch {
                     }
                     end_of_dedent = ByteOffset(end_of_dedent.0 + 1);
                 }
-                edits.push(Edit::Delete(start_of_line .. end_of_dedent));
+                edits.push(Edit::Delete(start_of_line..end_of_dedent));
             }
         }
 
@@ -195,19 +194,18 @@ impl EditBatch {
         for span in cursors.line_ranges(content).iter().rev() {
             // moving line span down is equivalent to moving the *next line *up*,
             // and if we do it that way it's easier to keep the cursors in right places
-            let next_line =
-                if span.end < content.len_lines() {
-                    let next_line_start = content.line_to_byte(span.end);
-                    let next_line_end = content.line_to_byte(span.end + 1);
-                    if next_line_start < next_line_end {
-                        edits.push(Edit::Delete(next_line_start .. next_line_end));
-                        content.slice(&(next_line_start .. next_line_end)).into()
-                    } else {
-                        Rope::from("\n")
-                    }
+            let next_line = if span.end < content.len_lines() {
+                let next_line_start = content.line_to_byte(span.end);
+                let next_line_end = content.line_to_byte(span.end + 1);
+                if next_line_start < next_line_end {
+                    edits.push(Edit::Delete(next_line_start..next_line_end));
+                    content.slice(&(next_line_start..next_line_end)).into()
                 } else {
                     Rope::from("\n")
-                };
+                }
+            } else {
+                Rope::from("\n")
+            };
             let start = content.line_to_byte(span.start);
             edits.push(Edit::Insert(start, next_line));
         }
@@ -228,7 +226,7 @@ impl Edit {
     }
 
     pub fn delete(offset: ByteOffset, length: usize) -> Self {
-        let range = offset .. ByteOffset(offset.0 + length);
+        let range = offset..ByteOffset(offset.0 + length);
         Edit::Delete(range)
     }
 

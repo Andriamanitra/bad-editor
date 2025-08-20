@@ -1,24 +1,23 @@
+mod app;
 pub mod cli;
+mod clipboard;
+mod cursor;
+mod editing;
+mod highlighter;
+mod linter;
+mod pane;
 mod prompt;
 mod render;
-mod app;
-mod run;
-mod editing;
-mod cursor;
-mod linter;
 mod rope_ext;
-mod highlighter;
 mod ropebuffer;
-mod pane;
-mod clipboard;
+mod run;
 
 use std::num::NonZeroUsize;
 
 pub use app::App;
-pub use pane::Pane;
-pub use pane::PaneAction;
-pub use rope_ext::RopeExt;
 pub use cursor::MultiCursor;
+pub use pane::{Pane, PaneAction};
+pub use rope_ext::RopeExt;
 
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct ByteOffset(pub usize);
@@ -29,7 +28,7 @@ impl ByteOffset {
 #[derive(Debug, Clone, Copy)]
 pub enum IndentKind {
     Spaces,
-    Tabs
+    Tabs,
 }
 
 #[derive(Debug, Clone)]

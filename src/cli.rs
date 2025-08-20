@@ -1,10 +1,8 @@
-use std::path::PathBuf;
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 
-use clap::builder::StringValueParser;
-use clap::Arg;
-use clap::Command;
-use clap::builder::TypedValueParser;
+use clap::builder::{StringValueParser, TypedValueParser};
+use clap::{Arg, Command};
 
 #[derive(Debug, Clone)]
 pub struct FilePathWithOptionalLocation {
@@ -55,8 +53,9 @@ pub fn parse_cli_args() -> clap::ArgMatches {
     Command::new("bad")
         .version("0.1")
         .arg(
-            Arg::new("file").value_parser(open_file_at_loc_parser)
-                .help("File to open, position can be specified via file[:row[:col]]")
+            Arg::new("file")
+                .value_parser(open_file_at_loc_parser)
+                .help("File to open, position can be specified via file[:row[:col]]"),
         )
         .get_matches()
 }

@@ -1,18 +1,16 @@
 use std::io::stdout;
 
-use bad_editor::App;
-use bad_editor::cli;
+use bad_editor::{App, cli};
 use crossterm::ExecutableCommand;
-use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
-use crossterm::cursor::Hide as HideCursor;
-use crossterm::cursor::Show as ShowCursor;
+use crossterm::cursor::{Hide as HideCursor, Show as ShowCursor};
 use crossterm::event::{
-    EnableMouseCapture,
     DisableMouseCapture,
-    PushKeyboardEnhancementFlags,
-    PopKeyboardEnhancementFlags,
+    EnableMouseCapture,
     KeyboardEnhancementFlags,
+    PopKeyboardEnhancementFlags,
+    PushKeyboardEnhancementFlags,
 };
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 
 struct TerminalGuard;
 impl TerminalGuard {

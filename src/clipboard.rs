@@ -2,7 +2,7 @@ use crossterm::clipboard::CopyToClipboard;
 
 pub struct Clipboard {
     /// stores one String per cursor to enable multicursor paste
-    internal: Vec<String>
+    internal: Vec<String>,
 }
 
 impl Clipboard {
@@ -28,4 +28,3 @@ impl Clipboard {
         &self.internal
     }
 }
-

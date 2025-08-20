@@ -1,32 +1,26 @@
 use std::io::ErrorKind;
 
 use nu_ansi_term::{Color, Style};
-use reedline::DefaultPrompt;
-use reedline::DefaultPromptSegment;
-use reedline::Reedline;
-use reedline::ReedlineEvent;
-use reedline::EditCommand;
-use reedline::KeyCode;
-use reedline::KeyModifiers;
-use reedline::MenuBuilder;
+use reedline::{
+    DefaultPrompt,
+    DefaultPromptSegment,
+    EditCommand,
+    KeyCode,
+    KeyModifiers,
+    MenuBuilder,
+    Reedline,
+    ReedlineEvent,
+};
 
-use crate::App;
 use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
-use crate::Action;
-use crate::PaneAction;
-use crate::MoveTarget;
-use crate::quote_path;
+use crate::{Action, App, MoveTarget, PaneAction, quote_path};
 
 fn parse_insertchar(s: &str) -> Option<char> {
     if let Some(s_hexadecimal) = s.strip_prefix("U+") {
-        u32::from_str_radix(s_hexadecimal, 16)
-            .ok()
-            .and_then(char::from_u32)
+        u32::from_str_radix(s_hexadecimal, 16).ok().and_then(char::from_u32)
     } else if s.starts_with(|c: char| c.is_ascii_digit()) {
-        s.parse::<u32>()
-            .ok()
-            .and_then(char::from_u32)
+        s.parse::<u32>().ok().and_then(char::from_u32)
     } else {
         unicode_names2::character(s)
     }
@@ -51,7 +45,7 @@ impl App {
         self.state = AppState::InPrompt;
         if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
-                "exit" | "quit" | "q" | ":q"  => self.enqueue(Action::Quit),
+                "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
                 "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
                 "goto" => {
                     if let Some(target) = parse_target(&arg) {
@@ -103,7 +97,7 @@ impl App {
                             _ => format!("{err}: {fpath}"),
                         });
                     }
-                }
+                },
                 "save" => {
                     if arg.is_empty() {
                         self.enqueue(Action::HandledByPane(PaneAction::Save));
@@ -148,9 +142,8 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
         ReedlineEvent::UntilFound(vec![
             ReedlineEvent::Menu("completion_menu".into()),
             ReedlineEvent::MenuNext,
-        ])
+        ]),
     );
-
 
     let commands = vec![
         "exit".into(),
@@ -162,8 +155,7 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
         "quit".into(),
     ];
 
-    let completer =
-        reedline::DefaultCompleter::new_with_wordlen(commands, 1);
+    let completer = reedline::DefaultCompleter::new_with_wordlen(commands, 1);
 
     let completion_menu =
         reedline::ReedlineMenu::EngineCompleter(

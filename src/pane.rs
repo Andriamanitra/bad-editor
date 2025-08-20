@@ -1,17 +1,13 @@
 use std::io::{BufReader, ErrorKind, Read};
 use std::num::NonZeroUsize;
-use std::path::PathBuf;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::cli::FilePathWithOptionalLocation;
 use crate::cursor::Cursor;
 use crate::editing::EditBatch;
-use crate::ropebuffer::RopeBuffer;
-use crate::ByteOffset;
-use crate::IndentKind;
-use crate::MoveTarget;
-use crate::MultiCursor;
 use crate::linter::Lint;
+use crate::ropebuffer::RopeBuffer;
+use crate::{ByteOffset, IndentKind, MoveTarget, MultiCursor};
 
 #[derive(Debug, Clone)]
 pub enum PaneAction {
@@ -48,9 +44,7 @@ pub struct PaneSettings {
 impl PaneSettings {
     fn indent_as_string(&self) -> String {
         match self.indent_kind {
-            IndentKind::Spaces => {
-                " ".repeat(self.indent_width)
-            }
+            IndentKind::Spaces => " ".repeat(self.indent_width),
             IndentKind::Tabs => {
                 let mut width = 0;
                 let mut indent = String::new();
@@ -84,7 +78,7 @@ impl PaneSettings {
             if let Ok(indent_width) = props.get::<IndentSize>() {
                 settings.indent_width = match indent_width {
                     IndentSize::UseTabWidth => settings.tab_width,
-                    IndentSize::Value(n) => n
+                    IndentSize::Value(n) => n,
                 };
             }
         }
@@ -163,7 +157,7 @@ impl Pane {
                 RopeBuffer::from_str(&s)
             }
             Err(err) if err.kind() == ErrorKind::NotFound => RopeBuffer::new(),
-            Err(err) => return Err(err)
+            Err(err) => return Err(err),
         };
         self.title = fileloc.path.clone();
         self.path = Some(PathBuf::from(&fileloc.path));
@@ -184,7 +178,9 @@ impl Pane {
 
     fn save_as(&mut self, path: impl AsRef<Path>) {
         macro_rules! status_msg {
-            ($fmtmsg:expr) => {self.info.replace(format!($fmtmsg))}
+            ($fmtmsg:expr) => {
+                self.info.replace(format!($fmtmsg))
+            };
         }
 
         let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(true).open(&path) {
@@ -210,7 +206,8 @@ impl Pane {
     }
 
     pub fn selections(&self) -> Vec<String> {
-        self.cursors.iter()
+        self.cursors
+            .iter()
             .filter_map(|cursor| cursor.selection())
             .map(|sel| self.content.slice(&sel).to_string())
             .collect()

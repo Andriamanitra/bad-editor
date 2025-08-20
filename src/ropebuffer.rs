@@ -1,15 +1,11 @@
 use std::fmt::Display;
 use std::ops::Range;
 
-use ropey::Rope;
-use ropey::RopeSlice;
+use ropey::{Rope, RopeSlice};
 
 use crate::cursor::Cursor;
-use crate::RopeExt;
-use crate::ByteOffset;
-use crate::MultiCursor;
-use crate::editing::{EditBatch, Edit};
-
+use crate::editing::{Edit, EditBatch};
+use crate::{ByteOffset, MultiCursor, RopeExt};
 
 #[derive(Debug, Default)]
 pub struct RopeBuffer {
@@ -50,7 +46,7 @@ impl RopeBuffer {
 
     pub fn byte_to_column(&self, offset: ByteOffset) -> usize {
         let line_start = self.line_to_byte(self.byte_to_line(offset));
-        let line_up_to_offset = line_start .. offset;
+        let line_up_to_offset = line_start..offset;
         self.slice(&line_up_to_offset).count_grapheme_clusters()
     }
 
@@ -90,7 +86,7 @@ impl RopeBuffer {
         }
 
         fn is_midnum(c: char) -> bool {
-            matches!(c, '\u{066C}' | '\u{FE50}' | '\u{FE54}' | '\u{FF0C}' |  '\u{FF1B}')
+            matches!(c, '\u{066C}' | '\u{FE50}' | '\u{FE54}' | '\u{FF0C}' | '\u{FF1B}')
         }
 
         let char_offset = self.byte_to_char(offset);
@@ -138,7 +134,7 @@ impl RopeBuffer {
     }
 
     pub fn slice(&self, range: &Range<ByteOffset>) -> RopeSlice<'_> {
-        self.rope.byte_slice(range.start.0 .. range.end.0)
+        self.rope.byte_slice(range.start.0..range.end.0)
     }
 
     fn edit_rope(&mut self, edits: &EditBatch) {
@@ -155,27 +151,25 @@ impl RopeBuffer {
         let mut n_deleted: usize = 0;
         let mut n_inserted: usize = 0;
         for edit in edits.iter() {
-            inverted_edits.push(
-                match edit {
-                    Edit::Insert(offset, s) => {
-                        let mut offset = *offset;
-                        offset.0 += n_inserted;
-                        offset.0 -= n_deleted;
-                        n_inserted += s.len_bytes();
-                        Edit::delete(offset, s.len_bytes())
-                    }
-                    Edit::Delete(range) => {
-                        let mut range = range.clone();
-                        let rope = self.slice(&range).into();
-                        range.start.0 += n_inserted;
-                        range.start.0 -= n_deleted;
-                        range.end.0 += n_inserted;
-                        range.end.0 -= n_deleted;
-                        n_deleted += range.end.0 - range.start.0;
-                        Edit::Insert(range.start, rope)
-                    }
+            inverted_edits.push(match edit {
+                Edit::Insert(offset, s) => {
+                    let mut offset = *offset;
+                    offset.0 += n_inserted;
+                    offset.0 -= n_deleted;
+                    n_inserted += s.len_bytes();
+                    Edit::delete(offset, s.len_bytes())
                 }
-            );
+                Edit::Delete(range) => {
+                    let mut range = range.clone();
+                    let rope = self.slice(&range).into();
+                    range.start.0 += n_inserted;
+                    range.start.0 -= n_deleted;
+                    range.end.0 += n_inserted;
+                    range.end.0 -= n_deleted;
+                    n_deleted += range.end.0 - range.start.0;
+                    Edit::Insert(range.start, rope)
+                }
+            });
         }
         EditBatch::from_edits(inverted_edits)
     }
@@ -321,7 +315,8 @@ impl RopeBuffer {
     fn find_byte_positions_backwards_from(&self, from: ByteOffset, c: u8) -> impl Iterator<Item = ByteOffset> {
         // note that .reversed() is different than .rev():
         // it iterates backwards from the *CURRENT* position of the iterator
-        self.rope.bytes_at(from.0)
+        self.rope
+            .bytes_at(from.0)
             .reversed()
             .enumerate()
             .filter(move |(_, x)| *x == c)
@@ -329,7 +324,8 @@ impl RopeBuffer {
     }
 
     fn find_byte_positions_from(&self, from: ByteOffset, c: u8) -> impl Iterator<Item = ByteOffset> {
-        self.rope.bytes_at(from.0)
+        self.rope
+            .bytes_at(from.0)
             .enumerate()
             .filter(move |(_, x)| *x == c)
             .map(move |(i, _)| ByteOffset(from.0 + i))
@@ -371,8 +367,7 @@ mod tests {
     fn find_bytes() {
         let s = "aaaba".to_string();
         let r = RopeBuffer::from_str(&s);
-        let positions = r.find_byte_positions_from(ByteOffset(0), b'a')
-            .collect::<Vec<_>>();
+        let positions = r.find_byte_positions_from(ByteOffset(0), b'a').collect::<Vec<_>>();
         assert_eq!(positions, vec![ByteOffset(0), ByteOffset(1), ByteOffset(2), ByteOffset(4)]);
     }
 
@@ -380,8 +375,7 @@ mod tests {
     fn find_bytes_backwards() {
         let s = "aaaba".to_string();
         let r = RopeBuffer::from_str(&s);
-        let positions = r.find_byte_positions_backwards_from(ByteOffset(5), b'a')
-            .collect::<Vec<_>>();
+        let positions = r.find_byte_positions_backwards_from(ByteOffset(5), b'a').collect::<Vec<_>>();
         assert_eq!(positions, vec![ByteOffset(4), ByteOffset(2), ByteOffset(1), ByteOffset(0)]);
     }
 

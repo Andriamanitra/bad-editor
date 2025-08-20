@@ -12,5 +12,4 @@ fn main() {
     let syntax_set = syntax_set_builder.build();
     dump_to_uncompressed_file(&syntax_set, format!("{out_dir}/syntaxes.packdump"))
         .expect("dumping syntaxes should work");
-
 }

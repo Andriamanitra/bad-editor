@@ -1,8 +1,7 @@
 use std::ops::Range;
 
-use crate::ByteOffset;
-use crate::MoveTarget;
 use crate::ropebuffer::RopeBuffer;
+use crate::{ByteOffset, MoveTarget};
 
 #[derive(Debug, Clone)]
 pub struct MultiCursor {
@@ -106,7 +105,7 @@ impl Default for MultiCursor {
 pub struct Cursor {
     pub(crate) offset: ByteOffset,
     pub(crate) selection_from: Option<ByteOffset>,
-    memorized_column: Option<usize>
+    memorized_column: Option<usize>,
 }
 
 impl Cursor {
@@ -132,9 +131,9 @@ impl Cursor {
 
     pub fn selection(&self) -> Option<Range<ByteOffset>> {
         match self.selection_from {
-            Some(sel_from) if sel_from > self.offset => Some(self.offset .. sel_from),
-            Some(sel_from) => Some(sel_from .. self.offset),
-            None => None
+            Some(sel_from) if sel_from > self.offset => Some(self.offset..sel_from),
+            Some(sel_from) => Some(sel_from..self.offset),
+            None => None,
         }
     }
 
@@ -362,7 +361,7 @@ impl Cursor {
             Some(b']') => find_pair(b'[', b']', true),
             Some(b'}') => find_pair(b'{', b'}', true),
             Some(b'>') => find_pair(b'<', b'>', true),
-            _ => None
+            _ => None,
         }
     }
 
@@ -371,26 +370,26 @@ impl Cursor {
             Some(sel) if sel < self.offset => {
                 let lineno_start = content.byte_to_line(sel);
                 let lineno_end = content.byte_to_line(self.offset);
-                lineno_start..lineno_end+1
+                lineno_start..lineno_end + 1
             }
             Some(sel) => {
                 let lineno_start = content.byte_to_line(self.offset);
                 let lineno_end = content.byte_to_line(sel);
-                lineno_start..lineno_end+1
+                lineno_start..lineno_end + 1
             }
             None => {
                 let lineno = content.byte_to_line(self.offset);
-                lineno..lineno+1
+                lineno..lineno + 1
             }
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     const SIMPLE_EMOJI: &str = "\u{1f60a}";
     const THUMBS_UP_WITH_MODIFIER: &str = "\u{1f44d}\u{1f3fb}";
@@ -624,7 +623,7 @@ mod tests {
     fn matching_pair(
         #[case] s: &'static str,
         #[case] start: usize,
-        #[case] expected: Option<ByteOffset>
+        #[case] expected: Option<ByteOffset>,
     ) {
         let r = RopeBuffer::from_str(s);
         let cursor = Cursor::new_with_offset(ByteOffset(start));
