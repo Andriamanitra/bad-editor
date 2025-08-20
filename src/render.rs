@@ -63,6 +63,13 @@ fn unicode_line_break_symbol(grapheme_cluster: &str) -> Option<&'static str> {
 }
 
 fn replacement_symbol(g: &str) -> Option<String> {
+    if UnicodeWidthStr::width(g) == 0 {
+        let mut s = String::new();
+        for c in g.chars() {
+            s.push_str(&format!("<U+{:X}>", c as u32));
+        }
+        return Some(s)
+    }
     if g.len() != 1 {
         return None
     }
@@ -396,5 +403,16 @@ impl App {
         // this ensures prompt is printed in the right place!
         writer.queue(MoveTo(0, wsize.rows - 1))?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_replacement_symbols() {
+        assert_eq!(replacement_symbol("\u{200C}"), Some("<U+200C>".into()));
+        assert_eq!(replacement_symbol("\u{0}"), Some("<00>".into()));
     }
 }

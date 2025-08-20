@@ -27,8 +27,6 @@ fn parse_insertchar(s: &str) -> Option<char> {
         s.parse::<u32>()
             .ok()
             .and_then(char::from_u32)
-    } else if s.eq_ignore_ascii_case("zwj") {
-        Some('\u{200d}')
     } else {
         unicode_names2::character(s)
     }
