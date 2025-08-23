@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
-use syntect::easy::HighlightLines;
-//use syntect::parsing::SyntaxSetBuilder;
-use syntect::highlighting::Color;
 use syntect::highlighting::{
+    Color,
+    HighlightIterator,
+    HighlightState,
+    Highlighter,
     ScopeSelectors,
     Style,
     StyleModifier,
@@ -11,7 +13,9 @@ use syntect::highlighting::{
     ThemeItem,
     ThemeSettings,
 };
-use syntect::parsing::SyntaxSet;
+use syntect::parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet};
+
+use crate::ropebuffer::RopeBuffer;
 
 pub struct BadHighlighterManager {
     theme: Theme,
@@ -69,23 +73,107 @@ impl BadHighlighterManager {
         Self { theme, syntax_set }
     }
 
-    pub fn highlighter_for_file<'a>(&'a self, file_path: &str) -> BadHighlighter<'a> {
+    pub fn highlighter2_for_file(&self, file_path: &str) -> BadHighlighter {
         let syntax = match self.syntax_set.find_syntax_for_file(file_path) {
             Ok(Some(s)) => s,
             _ => self.syntax_set.find_syntax_plain_text(),
         };
-        let highlighter = HighlightLines::new(syntax, &self.theme);
-        BadHighlighter { ss: &self.syntax_set, highlighter }
+        BadHighlighter::new(syntax, &self.theme, &self.syntax_set)
     }
 }
 
-pub struct BadHighlighter<'a> {
-    ss: &'a SyntaxSet,
-    highlighter: HighlightLines<'a>,
+#[derive(Clone)]
+pub struct CacheEntry {
+    parse_state: ParseState,
+    highlight_state: HighlightState,
+    line_number: usize,
 }
 
-impl BadHighlighter<'_> {
-    pub fn highlight<'t>(&mut self, text: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
-        self.highlighter.highlight_line(text, self.ss).unwrap().into_iter()
+pub struct BadHighlighter<'a> {
+    syntax_set: &'a SyntaxSet,
+    highlighter: Highlighter<'a>,
+    pub cache: BTreeMap<usize, CacheEntry>,
+    initial_parse_state: ParseState,
+    parse_state: ParseState,
+    highlight_state: HighlightState,
+    current_line: usize,
+}
+
+impl<'a> BadHighlighter<'a> {
+    pub fn new(syntax: &'a SyntaxReference, theme: &'a Theme, syntax_set: &'a SyntaxSet) -> Self {
+        let highlighter = Highlighter::new(theme);
+        let initial_parse_state = ParseState::new(syntax);
+        let parse_state = initial_parse_state.clone();
+        let highlight_state = HighlightState::new(&highlighter, ScopeStack::new());
+        Self {
+            highlighter,
+            syntax_set,
+            cache: BTreeMap::new(),
+            initial_parse_state,
+            parse_state,
+            highlight_state,
+            current_line: 0,
+        }
+    }
+
+    fn reset_state(&mut self) {
+        self.current_line = 0;
+        self.parse_state.clone_from(&self.initial_parse_state);
+        self.highlight_state = HighlightState::new(&self.highlighter, ScopeStack::new());
+    }
+
+    pub fn invalidate_cache_starting_from_line(&mut self, lineno: usize) {
+        self.cache.split_off(&lineno);
+        // If we're currently positioned after the invalidation point, reset
+        if self.current_line >= lineno {
+            self.reset_state();
+        }
+    }
+
+    pub fn skip_to_line(&mut self, target_line: usize, text: &RopeBuffer) {
+        if self.current_line == target_line {
+            return
+        }
+
+        // Find the best cache entry to start from
+        if let Some((_, cache_entry)) = self.cache.range(..=target_line).next_back() {
+            self.current_line = cache_entry.line_number;
+            self.highlight_state = cache_entry.highlight_state.clone();
+            self.parse_state = cache_entry.parse_state.clone();
+        } else if self.current_line > target_line {
+            self.reset_state();
+        }
+
+        for line in text.lines_at(self.current_line) {
+            self.parse_line(&line.to_string());
+            if self.current_line == target_line {
+                return
+            }
+        }
+    }
+
+    fn parse_line(&mut self, line: &str) {
+        let ops = self.parse_state.parse_line(line, self.syntax_set).unwrap_or_default();
+        for _ in HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.highlighter) {}
+        self.current_line += 1;
+        self.memorize_current_state();
+    }
+
+    fn memorize_current_state(&mut self) {
+        if self.current_line & 1023 == 1023 {
+            self.cache.insert(self.current_line, CacheEntry {
+                parse_state: self.parse_state.clone(),
+                highlight_state: self.highlight_state.clone(),
+                line_number: self.current_line,
+            });
+        }
+    }
+
+    pub fn highlight_line<'t>(&mut self, line: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
+        let ops = self.parse_state.parse_line(line, self.syntax_set).unwrap_or_default();
+        let highlights = HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.highlighter).collect::<Vec<_>>();
+        self.current_line += 1;
+        self.memorize_current_state();
+        highlights.into_iter()
     }
 }
