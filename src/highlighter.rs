@@ -83,7 +83,7 @@ impl BadHighlighterManager {
 }
 
 #[derive(Clone)]
-pub struct CacheEntry {
+pub struct CachedState {
     parse_state: ParseState,
     highlight_state: HighlightState,
     line_number: usize,
@@ -92,7 +92,7 @@ pub struct CacheEntry {
 pub struct BadHighlighter<'a> {
     syntax_set: &'a SyntaxSet,
     highlighter: Highlighter<'a>,
-    pub cache: BTreeMap<usize, CacheEntry>,
+    pub cache: BTreeMap<usize, CachedState>,
     initial_parse_state: ParseState,
     parse_state: ParseState,
     highlight_state: HighlightState,
@@ -136,19 +136,19 @@ impl<'a> BadHighlighter<'a> {
         }
 
         // Find the best cache entry to start from
-        if let Some((_, cache_entry)) = self.cache.range(..=target_line).next_back() {
-            self.current_line = cache_entry.line_number;
-            self.highlight_state = cache_entry.highlight_state.clone();
-            self.parse_state = cache_entry.parse_state.clone();
+        if let Some((_, cached_state)) = self.cache.range(..=target_line).next_back() {
+            self.current_line = cached_state.line_number;
+            self.highlight_state = cached_state.highlight_state.clone();
+            self.parse_state = cached_state.parse_state.clone();
         } else if self.current_line > target_line {
             self.reset_state();
         }
 
         for line in text.lines_at(self.current_line) {
-            self.parse_line(&line.to_string());
             if self.current_line == target_line {
                 return
             }
+            self.parse_line(&line.to_string());
         }
     }
 
@@ -161,7 +161,7 @@ impl<'a> BadHighlighter<'a> {
 
     fn memorize_current_state(&mut self) {
         if self.current_line & 1023 == 1023 {
-            self.cache.insert(self.current_line, CacheEntry {
+            self.cache.insert(self.current_line, CachedState {
                 parse_state: self.parse_state.clone(),
                 highlight_state: self.highlight_state.clone(),
                 line_number: self.current_line,
