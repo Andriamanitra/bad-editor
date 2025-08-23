@@ -1,10 +1,12 @@
 use std::io::{BufReader, ErrorKind, Read};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::cli::FilePathWithOptionalLocation;
 use crate::cursor::Cursor;
 use crate::editing::EditBatch;
+use crate::highlighter::{BadHighlighter, BadHighlighterManager};
 use crate::linter::Lint;
 use crate::ropebuffer::RopeBuffer;
 use crate::{ByteOffset, IndentKind, MoveTarget, MultiCursor};
@@ -106,6 +108,7 @@ pub struct Pane {
     pub(crate) modified: bool,
     pub(crate) cursors: MultiCursor,
     pub(crate) settings: PaneSettings,
+    pub(crate) highlighter: Option<BadHighlighter>,
     pub(crate) last_search: Option<String>,
     pub(crate) lints: Vec<Lint>,
     info: Option<String>,
@@ -124,6 +127,7 @@ impl Pane {
             viewport_width: 0,
 
             settings: PaneSettings::default(),
+            highlighter: None,
             last_search: None,
             lints: vec![],
             info: None,
@@ -148,7 +152,7 @@ impl Pane {
         self.info.as_ref().map(|s| s.as_ref())
     }
 
-    pub fn open_file(&mut self, fileloc: &FilePathWithOptionalLocation) -> std::io::Result<()> {
+    pub fn open_file(&mut self, fileloc: &FilePathWithOptionalLocation, hl: Arc<BadHighlighterManager>) -> std::io::Result<()> {
         let content = match std::fs::File::open(&fileloc.path) {
             Ok(file) => {
                 // TODO: do something more efficient than this
@@ -164,6 +168,7 @@ impl Pane {
         self.content = content;
         self.cursors = MultiCursor::new();
         self.lints.clear();
+        self.highlighter = Some(BadHighlighter::new_for_file(&fileloc.path, hl));
         self.settings = PaneSettings::from_editorconfig(&fileloc.path);
         self.modified = false;
         if let Some(line_no) = fileloc.line {
@@ -236,6 +241,10 @@ impl Pane {
     }
 
     fn apply_editbatch(&mut self, edits: EditBatch) {
+        for hl in self.highlighter.iter_mut() {
+            let lineno = self.content.byte_to_line(edits.first_edit_offset());
+            hl.invalidate_cache_starting_from_line(lineno);
+        }
         self.content.do_edits(&mut self.cursors, edits);
         self.modified = true;
         self.adjust_viewport();

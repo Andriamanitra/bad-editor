@@ -14,6 +14,7 @@ use syntect::highlighting::{FontStyle as SyntectFontStyle, Style as SyntectStyle
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+use crate::highlighter::BadHighlighter;
 use crate::{App, ByteOffset};
 
 fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
@@ -189,7 +190,7 @@ impl App {
         )
     }
 
-    pub fn render(&self, mut writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
+    pub fn render(&mut self, mut writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
         writer.queue(crossterm::cursor::Hide)?;
 
@@ -198,7 +199,11 @@ impl App {
             writer.queue(MoveTo(0, 0))?;
             writer.queue(Print("window too smol"))?;
         } else {
-            self.render_content(writer, wsize)?;
+            let mut hl = self.current_pane_mut().highlighter.take().unwrap_or_else(|| {
+                BadHighlighter::new_for_file("", self.highlighting.clone())
+            });
+            self.render_content(writer, wsize, &mut hl)?;
+            self.current_pane_mut().highlighter.replace(hl);
         }
         writer.flush()?;
 
@@ -206,7 +211,7 @@ impl App {
         Ok(())
     }
 
-    fn render_content(&self, writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
+    fn render_content(&self, writer: &mut dyn std::io::Write, wsize: &WindowSize, hl: &mut BadHighlighter) -> std::io::Result<()> {
         let current_pane = &self.current_pane();
         let now = Instant::now();
         let content = &current_pane.content;
@@ -231,11 +236,9 @@ impl App {
             NoSelection(ByteOffset),
         }
 
-        let mut hl = self.highlighting.highlighter_for_file(&current_pane.title);
-
         let mut curs = {
             let mut curs: Vec<Cur> = vec![];
-            for cursor in self.current_pane().cursors.iter() {
+            for cursor in current_pane.cursors.iter() {
                 match cursor.selection_from {
                     Some(sel_from) => {
                         let a = cursor.offset.min(sel_from);
@@ -254,8 +257,6 @@ impl App {
             curs.into_iter().peekable()
         };
 
-        let mut byte_offset = ByteOffset(0);
-
         let mut last_visible_lineno = current_pane.viewport_position_row + current_pane.viewport_height as usize;
         let max_lineno_width = {
             let mut n = content.len_lines();
@@ -273,27 +274,27 @@ impl App {
             current_column: 0,
             visible_from_column: 0,
             available_columns: (wsize.columns as usize).saturating_sub(max_lineno_width + 2),
-            tab_width: self.current_pane().settings.tab_width,
+            tab_width: current_pane.settings.tab_width,
             token_style: default_style,
             queue: vec![],
         };
 
         let mut console_row: u16 = 0;
         writer.queue(MoveTo(0, 0))?;
-        for (lineno, line) in content.lines().enumerate() {
+        let first_visible_lineno = current_pane.viewport_position_row;
+        let mut byte_offset = content.line_to_byte(first_visible_lineno);
+
+        hl.skip_to_line(first_visible_lineno, content);
+
+        for (line, lineno) in content.lines_at(current_pane.viewport_position_row).zip(first_visible_lineno..) {
             if lineno > last_visible_lineno {
                 break
             }
             let line = line.to_string();
-            if lineno < current_pane.viewport_position_row {
-                byte_offset.0 += line.len();
-                for _ in hl.highlight(&line) {}
-                continue
-            }
             ctx.visible_from_column = 0;
             ctx.current_column = 0;
 
-            for (style, s) in hl.highlight(&line) {
+            for (style, s) in hl.highlight_line(&line) {
                 ctx.token_style = to_crossterm_style(style);
                 for g in s.graphemes(true) {
                     ctx.is_cursor = false;
@@ -320,7 +321,7 @@ impl App {
             // render cursor at the end of the file
             if 1 + lineno >= content.len_lines() && {
                 let content_end_offset = ByteOffset(content.len_bytes());
-                self.current_pane().cursors.iter().any(|cur| !cur.has_selection() && cur.offset == content_end_offset)
+                current_pane.cursors.iter().any(|cur| !cur.has_selection() && cur.offset == content_end_offset)
             } {
                 ctx.is_cursor = true;
                 let required_columns = ctx.current_column + 1;
