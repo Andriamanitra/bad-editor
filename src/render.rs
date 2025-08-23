@@ -199,8 +199,9 @@ impl App {
             writer.queue(MoveTo(0, 0))?;
             writer.queue(Print("window too smol"))?;
         } else {
-            let hl_manager = self.highlighting.clone();
-            let mut hl = self.current_pane_mut().highlighter.take().unwrap_or_else(|| BadHighlighter::new_for_file("", hl_manager));
+            let mut hl = self.current_pane_mut().highlighter.take().unwrap_or_else(|| {
+                BadHighlighter::new_for_file("", self.highlighting.clone())
+            });
             self.render_content(writer, wsize, &mut hl)?;
             self.current_pane_mut().highlighter.replace(hl);
         }
