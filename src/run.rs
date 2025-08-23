@@ -97,6 +97,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('n') if ctrl => Action::HandledByPane(PaneAction::RepeatFind),
                 KeyCode::Char('d') if ctrl => Action::HandledByPane(PaneAction::QuickAddNext),
                 KeyCode::Char('c') if ctrl => Action::Copy,
+                KeyCode::Char('x') if ctrl => Action::Cut,
                 KeyCode::Char('v') if ctrl => Action::Paste,
                 KeyCode::Char('a') if ctrl => Action::HandledByPane(PaneAction::SelectAll),
                 KeyCode::Char('s') if ctrl => Action::HandledByPane(PaneAction::Save),

@@ -246,6 +246,22 @@ impl Pane {
         self.apply_editbatch(edits);
     }
 
+    pub fn cut(&mut self) -> Vec<String> {
+        let edits = EditBatch::cut(&self.cursors, &self.content);
+        for cursor in self.cursors.iter_mut() {
+            cursor.deselect();
+        }
+        let clips = edits.iter().filter_map(|edit| {
+            if let crate::editing::Edit::Delete(range) = edit {
+                Some(self.content.slice(range).to_string())
+            } else {
+                None
+            }
+        }).collect();
+        self.apply_editbatch(edits);
+        clips
+    }
+
     pub(crate) fn handle_event(&mut self, event: PaneAction) {
         match event {
             PaneAction::MoveTo(target) => {

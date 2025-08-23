@@ -41,6 +41,7 @@ pub enum Action {
     CommandPromptEdit(String),
     SetInfo(String),
     HandledByPane(PaneAction),
+    Cut,
     Copy,
     Paste,
 }

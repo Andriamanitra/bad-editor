@@ -87,6 +87,10 @@ impl App {
             Action::Copy => {
                 self.clipboard.copy(self.current_pane().selections());
             }
+            Action::Cut => {
+                let cuts = self.current_pane_mut().cut();
+                self.clipboard.copy(cuts);
+            }
             Action::Paste => {
                 let clips = self.clipboard.content().to_vec();
                 self.current_pane_mut().insert_from_clipboard(&clips);

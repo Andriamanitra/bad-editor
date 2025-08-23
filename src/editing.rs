@@ -63,6 +63,20 @@ impl EditBatch {
         }
     }
 
+    pub fn cut(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
+        let mut edits = vec![];
+        for cursor in cursors.iter() {
+            if let Some(selection) = cursor.selection() {
+                edits.push(Edit::Delete(selection));
+            } else {
+                let a = cursor.line_start(content);
+                let b = cursor.line_end(content);
+                edits.push(Edit::Delete(a..b));
+            }
+        }
+        Self::from_edits(edits)
+    }
+
     pub fn delete_backward_with_cursors(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
         let mut edits = vec![];
         for cursor in cursors.iter() {
