@@ -87,15 +87,18 @@ impl App {
                         self.enqueue(Action::HandledByPane(PaneAction::Insert(out)))
                     }
                 }
-                "open" => match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(&arg)) {
-                    Ok(()) => {},
-                    Err(err) => {
-                        let fpath = quote_path(&arg);
-                        self.inform(match err.kind() {
-                            ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
-                            ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
-                            _ => format!("{err}: {fpath}"),
-                        });
+                "open" => {
+                    let hl = self.highlighting.clone();
+                    match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(&arg), hl) {
+                        Ok(()) => {},
+                        Err(err) => {
+                            let fpath = quote_path(&arg);
+                            self.inform(match err.kind() {
+                                ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
+                                ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
+                                _ => format!("{err}: {fpath}"),
+                            });
+                        }
                     }
                 },
                 "save" => {

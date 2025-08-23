@@ -20,6 +20,10 @@ impl EditBatch {
         self.edits.iter()
     }
 
+    pub fn first_edit_offset(&self) -> ByteOffset {
+        self.edits.first().map(|e| e.pos()).unwrap_or(ByteOffset::MAX)
+    }
+
     pub fn from_edits(mut edits: Vec<Edit>) -> Self {
         edits.sort();
         let mut next_start_offset = ByteOffset::MAX;

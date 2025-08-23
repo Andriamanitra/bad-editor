@@ -14,6 +14,7 @@ use syntect::highlighting::{FontStyle as SyntectFontStyle, Style as SyntectStyle
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+use crate::highlighter::BadHighlighter;
 use crate::{App, ByteOffset};
 
 fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
@@ -189,7 +190,7 @@ impl App {
         )
     }
 
-    pub fn render(&self, mut writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
+    pub fn render(&mut self, mut writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
         crossterm::execute!(&mut writer, BeginSynchronizedUpdate)?;
         writer.queue(crossterm::cursor::Hide)?;
 
@@ -198,7 +199,10 @@ impl App {
             writer.queue(MoveTo(0, 0))?;
             writer.queue(Print("window too smol"))?;
         } else {
-            self.render_content(writer, wsize)?;
+            let hl_manager = self.highlighting.clone();
+            let mut hl = self.current_pane_mut().highlighter.take().unwrap_or_else(|| BadHighlighter::new_for_file("", hl_manager));
+            self.render_content(writer, wsize, &mut hl)?;
+            self.current_pane_mut().highlighter.replace(hl);
         }
         writer.flush()?;
 
@@ -206,7 +210,7 @@ impl App {
         Ok(())
     }
 
-    fn render_content(&self, writer: &mut dyn std::io::Write, wsize: &WindowSize) -> std::io::Result<()> {
+    fn render_content(&self, writer: &mut dyn std::io::Write, wsize: &WindowSize, hl: &mut BadHighlighter) -> std::io::Result<()> {
         let current_pane = &self.current_pane();
         let now = Instant::now();
         let content = &current_pane.content;
@@ -279,12 +283,7 @@ impl App {
         let first_visible_lineno = current_pane.viewport_position_row;
         let mut byte_offset = content.line_to_byte(first_visible_lineno);
 
-        let title = current_pane.title.clone();
-        let mut hl = self.highlighting.highlighter2_for_file(&title);
-        let cache_len_before = hl.cache.len();
         hl.skip_to_line(first_visible_lineno, content);
-        let skip_elapsed = now.elapsed();
-        let cache_len_after_skip = hl.cache.len();
 
         for (line, lineno) in content.lines_at(current_pane.viewport_position_row).zip(first_visible_lineno..) {
             if lineno > last_visible_lineno {
@@ -395,7 +394,7 @@ impl App {
         writer.queue(Print(
             match self.status_msg() {
                 Some(info) => format!("{:.width$}", &info, width = wsize.columns as usize),
-                None => format!("render took {:.3?} (skip: {:.3?}, {}->{}->{})", now.elapsed(), skip_elapsed, cache_len_before, cache_len_after_skip, hl.cache.len()),
+                None => format!("render took {:.3?}", now.elapsed()),
             }
         ))?;
         // this ensures prompt is printed in the right place!

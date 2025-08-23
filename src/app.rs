@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
+use std::sync::Arc;
 
+use crate::cli::FilePathWithOptionalLocation;
 use crate::clipboard::Clipboard;
 use crate::highlighter::BadHighlighterManager;
 use crate::{Action, Pane};
@@ -14,24 +16,27 @@ pub struct App {
     pub(crate) current_pane_index: usize,
     pub(crate) state: AppState,
     pub(crate) action_queue: VecDeque<Action>,
-    pub(crate) highlighting: BadHighlighterManager,
+    pub(crate) highlighting: Arc<BadHighlighterManager>,
     pub(crate) clipboard: Clipboard,
     info: Option<String>,
 }
 
 impl App {
     pub fn new() -> Self {
-        let pane = Pane::empty();
-
         Self {
-            panes: vec![pane],
+            panes: vec![Pane::empty()],
             current_pane_index: 0,
             info: None,
             state: AppState::Idle,
             action_queue: VecDeque::new(),
-            highlighting: BadHighlighterManager::new(),
+            highlighting: Arc::new(BadHighlighterManager::new()),
             clipboard: Clipboard::new(),
         }
+    }
+
+    pub fn open_file_pane(&mut self, file_loc: &FilePathWithOptionalLocation) -> std::io::Result<()> {
+        let highlighting = self.highlighting.clone();
+        self.current_pane_mut().open_file(file_loc, highlighting)
     }
 
     pub fn status_msg(&self) -> Option<&str> {
