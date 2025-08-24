@@ -45,6 +45,14 @@ impl App {
         self.state = AppState::InPrompt;
         if let Some((command, arg)) = get_command(stub) {
             match command.as_str() {
+                _ if command.starts_with("|") => {
+                    let mut shell_command = command.trim_start_matches('|').to_string();
+                    if !arg.is_empty() {
+                        shell_command.push(' ');
+                        shell_command.push_str(&arg);
+                    }
+                    self.current_pane_mut().pipe_through_shell_command(&shell_command);
+                }
                 "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
                 "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
                 "goto" => {
@@ -52,6 +60,49 @@ impl App {
                         self.enqueue(Action::HandledByPane(PaneAction::MoveTo(target)));
                     } else {
                         self.inform(format!("goto error: {arg:?} is not a valid target"));
+                    }
+                }
+                "to" => {
+                    if let Some(reps) = arg.strip_prefix('*').and_then(|n| n.parse::<usize>().ok()) {
+                        self.current_pane_mut().transform_selections(|s| Some(s.repeat(reps)));
+                    } else if arg == "upper" {
+                        self.current_pane_mut().transform_selections(|s| Some(s.to_uppercase()));
+                    } else if arg == "lower" {
+                        self.current_pane_mut().transform_selections(|s| Some(s.to_lowercase()));
+                    } else if arg == "list" {
+                        self.current_pane_mut().transform_selections(|s| {
+                            let v = s.split_ascii_whitespace().collect::<Vec<_>>();
+                            Some(format!("[{}]", v.join(", ")))
+                        });
+                    } else if arg == "quoted" {
+                        self.current_pane_mut().transform_selections(|s| {
+                            let mut transformed = String::new();
+                            let mut in_word = false;
+                            for c in s.chars() {
+                                if c.is_ascii_whitespace() {
+                                    if in_word {
+                                        transformed.push('"');
+                                    }
+                                    transformed.push(c);
+                                    in_word = false;
+                                } else {
+                                    if !in_word {
+                                        transformed.push('"');
+                                    }
+                                    if c == '"' || c == '\\' {
+                                        transformed.push('\\');
+                                    }
+                                    transformed.push(c);
+                                    in_word = true;
+                                }
+                            }
+                            if in_word {
+                                transformed.push('"');
+                            }
+                            Some(transformed)
+                        });
+                    } else {
+                        self.inform(format!("to error: {arg:?} is not a valid transformation"));
                     }
                 }
                 "lint" => {
@@ -156,6 +207,10 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
         "open".into(),
         "save".into(),
         "quit".into(),
+        "to lower".into(),
+        "to upper".into(),
+        "to quoted".into(),
+        "to list".into(),
     ];
 
     let completer = reedline::DefaultCompleter::new_with_wordlen(commands, 1);

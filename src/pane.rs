@@ -1,4 +1,4 @@
-use std::io::{BufReader, ErrorKind, Read};
+use std::io::{BufReader, ErrorKind, Read, Write};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -274,6 +274,41 @@ impl Pane {
             cursor.deselect();
         }
         clips
+    }
+
+    pub(crate) fn transform_selections<F>(&mut self, transform: F)
+        where F: Fn(String) -> Option<String>
+    {
+        let edits = EditBatch::transform_selections(&self.cursors, &self.content, transform);
+        self.apply_editbatch(edits);
+        for cursor in self.cursors.iter_mut() {
+            cursor.deselect();
+        }
+    }
+
+    pub(crate) fn pipe_through_shell_command(&mut self, command_str: &str) {
+        fn run_shell(cmd: &str, input: &str) -> Option<String> {
+            let mut child_process = std::process::Command::new("sh");
+            let mut run = child_process
+                .args(["-c", cmd])
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .ok()?;
+            run.stdin.as_mut()?.write_all(input.as_bytes()).ok()?;
+            let output = run.wait_with_output().ok()?;
+            Some(String::from_utf8_lossy(&output.stdout).to_string())
+        }
+
+        // insert output of the command if there is only one cursor without selection,
+        // otherwise pipe each selection through the command
+        if !self.cursors.primary().has_selection() && self.cursors.cursor_count() == 1 {
+            let output = run_shell(command_str, "").unwrap_or_default();
+            let edits = EditBatch::insert_with_cursors(&self.cursors, &output);
+            self.apply_editbatch(edits);
+        } else {
+            self.transform_selections(|sel| run_shell(command_str, &sel));
+        }
     }
 
     pub(crate) fn handle_event(&mut self, event: PaneAction) {
