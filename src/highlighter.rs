@@ -93,6 +93,7 @@ pub struct CachedState {
 }
 
 pub struct BadHighlighter {
+    filetype: String,
     manager: Arc<BadHighlighterManager>,
     cache: BTreeMap<usize, CachedState>,
     initial_parse_state: ParseState,
@@ -112,6 +113,7 @@ impl BadHighlighter {
         let parse_state = initial_parse_state.clone();
         let highlight_state = HighlightState::new(&highlighter, ScopeStack::new());
         Self {
+            filetype: syntax.name.clone(),
             manager,
             cache: BTreeMap::new(),
             initial_parse_state,
@@ -119,6 +121,15 @@ impl BadHighlighter {
             highlight_state,
             current_line: 0,
         }
+    }
+
+    pub fn ft(&self) -> &str {
+        // "Plain Text" is hardcoded name for the fallback syntax in syntect but it
+        // doesn't match our filetype naming conventions (short and all lowercase)
+        if self.filetype == "Plain Text" {
+            return "plain"
+        }
+        &self.filetype
     }
 
     fn reset_state(&mut self) {

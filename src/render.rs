@@ -158,11 +158,13 @@ const LIGHT_GREY: Color = Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa };
 const LIGHTER_BG: Color = Color::Rgb { r: 0x24, g: 0x24, b: 0x24 };
 
 impl App {
-    fn status_line_text_left(&self) -> String {
-        match self.current_pane().modified {
-            true => format!("{} [+]", &self.current_pane().title),
-            false => self.current_pane().title.to_string(),
-        }
+    fn status_line_text_left(&self, ft: &str) -> String {
+        let title = &self.current_pane().title;
+        let modified = match self.current_pane().modified {
+            true => "[+] ",
+            false => "",
+        };
+        format!("{title} {modified}| ft:{ft}")
     }
 
     fn status_line_text_right(&self) -> String {
@@ -385,7 +387,7 @@ impl App {
         writer.queue(MoveTo(0, wsize.rows - 2))?;
         writer.queue(crossterm::style::SetStyle(default_style.negative()))?;
         let width = wsize.columns as usize;
-        let status_line_left = format!("{:width$}", self.status_line_text_left(), width = width);
+        let status_line_left = format!("{:width$}", self.status_line_text_left(hl.ft()), width = width);
         writer.queue(PrintStyledContent(default_style.negative().apply(status_line_left)))?;
         let status_line_right = self.status_line_text_right();
         writer.queue(MoveTo(width.saturating_sub(status_line_right.len()) as u16, wsize.rows - 2))?;
