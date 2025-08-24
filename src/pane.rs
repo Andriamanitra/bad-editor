@@ -241,9 +241,11 @@ impl Pane {
     }
 
     fn apply_editbatch(&mut self, edits: EditBatch) {
-        for hl in self.highlighter.iter_mut() {
-            let lineno = self.content.byte_to_line(edits.first_edit_offset());
-            hl.invalidate_cache_starting_from_line(lineno);
+        if let Some(offset) = edits.first_edit_offset() {
+            for hl in self.highlighter.iter_mut() {
+                let lineno = self.content.byte_to_line(offset);
+                hl.invalidate_cache_starting_from_line(lineno);
+            }
         }
         self.content.do_edits(&mut self.cursors, edits);
         self.modified = true;
