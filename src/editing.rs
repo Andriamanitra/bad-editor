@@ -20,6 +20,10 @@ impl EditBatch {
         self.edits.iter()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
     pub fn first_edit_offset(&self) -> Option<ByteOffset> {
         self.edits.first().map(|e| e.pos())
     }

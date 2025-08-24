@@ -241,6 +241,9 @@ impl Pane {
     }
 
     fn apply_editbatch(&mut self, edits: EditBatch) {
+        if edits.is_empty() {
+            return
+        }
         if let Some(offset) = edits.first_edit_offset() {
             for hl in self.highlighter.iter_mut() {
                 let lineno = self.content.byte_to_line(offset);
