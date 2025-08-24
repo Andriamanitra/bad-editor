@@ -41,132 +41,133 @@ fn parse_target(s: &str) -> Option<MoveTarget> {
 }
 
 impl App {
+    pub fn handle_command(&mut self, s: &str) {
+        if let Some(shell_command) = s.strip_prefix("|") {
+            self.current_pane_mut().pipe_through_shell_command(shell_command);
+            return
+        }
+        let (command, arg) = s.split_once(' ').unwrap_or((s, ""));
+        match command {
+            "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
+            "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg.to_string()))),
+            "goto" => {
+                if let Some(target) = parse_target(arg) {
+                    self.enqueue(Action::HandledByPane(PaneAction::MoveTo(target)));
+                } else {
+                    self.inform(format!("goto error: {arg:?} is not a valid target"));
+                }
+            }
+            "to" => {
+                if let Some(reps) = arg.strip_prefix('*').and_then(|n| n.parse::<usize>().ok()) {
+                    self.current_pane_mut().transform_selections(|s| Some(s.repeat(reps)));
+                } else if arg == "upper" {
+                    self.current_pane_mut().transform_selections(|s| Some(s.to_uppercase()));
+                } else if arg == "lower" {
+                    self.current_pane_mut().transform_selections(|s| Some(s.to_lowercase()));
+                } else if arg == "list" {
+                    self.current_pane_mut().transform_selections(|s| {
+                        let v = s.split_ascii_whitespace().collect::<Vec<_>>();
+                        Some(format!("[{}]", v.join(", ")))
+                    });
+                } else if arg == "quoted" {
+                    self.current_pane_mut().transform_selections(|s| {
+                        let mut transformed = String::new();
+                        let mut in_word = false;
+                        for c in s.chars() {
+                            if c.is_ascii_whitespace() {
+                                if in_word {
+                                    transformed.push('"');
+                                }
+                                transformed.push(c);
+                                in_word = false;
+                            } else {
+                                if !in_word {
+                                    transformed.push('"');
+                                }
+                                if c == '"' || c == '\\' {
+                                    transformed.push('\\');
+                                }
+                                transformed.push(c);
+                                in_word = true;
+                            }
+                        }
+                        if in_word {
+                            transformed.push('"');
+                        }
+                        Some(transformed)
+                    });
+                } else {
+                    self.inform(format!("to error: {arg:?} is not a valid transformation"));
+                }
+            }
+            "lint" => {
+                self.current_pane_mut().lints.clear();
+                // TODO: pick linter based on file type
+                match crate::linter::run_linter_command("rust") {
+                    Ok(lints_by_filename) => {
+                        // TODO: add lints for panes other than the current one
+                        for (fname, lints) in lints_by_filename.into_iter() {
+                            if self.current_pane().path.as_ref().is_some_and(|p| p == &fname) {
+                                self.current_pane_mut().lints = lints;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        self.inform(format!("linter error: {err:?}"));
+                    }
+                }
+            }
+            "insertchar" | "c" => {
+                let mut out = String::new();
+                let mut success = true;
+                for req in arg.split(',') {
+                    if let Some(c) = parse_insertchar(req.trim()) {
+                        out.push(c);
+                    } else {
+                        success = false;
+                        self.inform(format!("No character with name {req:?}"));
+                        break
+                    }
+                }
+                if success {
+                    self.enqueue(Action::HandledByPane(PaneAction::Insert(out)))
+                }
+            }
+            "open" => {
+                let hl = self.highlighting.clone();
+                match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(arg), hl) {
+                    Ok(()) => {},
+                    Err(err) => {
+                        let fpath = quote_path(arg);
+                        self.inform(match err.kind() {
+                            ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
+                            ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
+                            _ => format!("{err}: {fpath}"),
+                        });
+                    }
+                }
+            },
+            "save" => {
+                if arg.is_empty() {
+                    self.enqueue(Action::HandledByPane(PaneAction::Save));
+                } else {
+                    self.enqueue(Action::HandledByPane(PaneAction::SaveAs(arg.into())));
+                }
+            }
+            _ => self.inform(format!("Unknown command '{command}'")),
+        }
+    }
+
     pub fn command_prompt_with(&mut self, stub: Option<String>) {
         self.state = AppState::InPrompt;
-        if let Some((command, arg)) = get_command(stub) {
-            match command.as_str() {
-                _ if command.starts_with("|") => {
-                    let mut shell_command = command.trim_start_matches('|').to_string();
-                    if !arg.is_empty() {
-                        shell_command.push(' ');
-                        shell_command.push_str(&arg);
-                    }
-                    self.current_pane_mut().pipe_through_shell_command(&shell_command);
-                }
-                "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
-                "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg))),
-                "goto" => {
-                    if let Some(target) = parse_target(&arg) {
-                        self.enqueue(Action::HandledByPane(PaneAction::MoveTo(target)));
-                    } else {
-                        self.inform(format!("goto error: {arg:?} is not a valid target"));
-                    }
-                }
-                "to" => {
-                    if let Some(reps) = arg.strip_prefix('*').and_then(|n| n.parse::<usize>().ok()) {
-                        self.current_pane_mut().transform_selections(|s| Some(s.repeat(reps)));
-                    } else if arg == "upper" {
-                        self.current_pane_mut().transform_selections(|s| Some(s.to_uppercase()));
-                    } else if arg == "lower" {
-                        self.current_pane_mut().transform_selections(|s| Some(s.to_lowercase()));
-                    } else if arg == "list" {
-                        self.current_pane_mut().transform_selections(|s| {
-                            let v = s.split_ascii_whitespace().collect::<Vec<_>>();
-                            Some(format!("[{}]", v.join(", ")))
-                        });
-                    } else if arg == "quoted" {
-                        self.current_pane_mut().transform_selections(|s| {
-                            let mut transformed = String::new();
-                            let mut in_word = false;
-                            for c in s.chars() {
-                                if c.is_ascii_whitespace() {
-                                    if in_word {
-                                        transformed.push('"');
-                                    }
-                                    transformed.push(c);
-                                    in_word = false;
-                                } else {
-                                    if !in_word {
-                                        transformed.push('"');
-                                    }
-                                    if c == '"' || c == '\\' {
-                                        transformed.push('\\');
-                                    }
-                                    transformed.push(c);
-                                    in_word = true;
-                                }
-                            }
-                            if in_word {
-                                transformed.push('"');
-                            }
-                            Some(transformed)
-                        });
-                    } else {
-                        self.inform(format!("to error: {arg:?} is not a valid transformation"));
-                    }
-                }
-                "lint" => {
-                    self.current_pane_mut().lints.clear();
-                    // TODO: pick linter based on file type
-                    match crate::linter::run_linter_command("rust") {
-                        Ok(lints_by_filename) => {
-                            // TODO: add lints for panes other than the current one
-                            for (fname, lints) in lints_by_filename.into_iter() {
-                                if self.current_pane().path.as_ref().is_some_and(|p| p == &fname) {
-                                    self.current_pane_mut().lints = lints;
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            self.inform(format!("linter error: {err:?}"));
-                        }
-                    }
-                }
-                "insertchar" | "c" => {
-                    let mut out = String::new();
-                    let mut success = true;
-                    for req in arg.split(',') {
-                        if let Some(c) = parse_insertchar(req.trim()) {
-                            out.push(c);
-                        } else {
-                            success = false;
-                            self.inform(format!("No character with name {req:?}"));
-                            break
-                        }
-                    }
-                    if success {
-                        self.enqueue(Action::HandledByPane(PaneAction::Insert(out)))
-                    }
-                }
-                "open" => {
-                    let hl = self.highlighting.clone();
-                    match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(&arg), hl) {
-                        Ok(()) => {},
-                        Err(err) => {
-                            let fpath = quote_path(&arg);
-                            self.inform(match err.kind() {
-                                ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
-                                ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
-                                _ => format!("{err}: {fpath}"),
-                            });
-                        }
-                    }
-                },
-                "save" => {
-                    if arg.is_empty() {
-                        self.enqueue(Action::HandledByPane(PaneAction::Save));
-                    } else {
-                        self.enqueue(Action::HandledByPane(PaneAction::SaveAs(arg.into())));
-                    }
-                }
-                _ => self.inform(format!("Unknown command '{command}'")),
-            }
+        if let Some(s) = get_command(stub) {
+            self.handle_command(&s);
         }
         self.state = AppState::Idle;
     }
 }
 
-pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
+pub fn get_command(stub: Option<String>) -> Option<String> {
     // TODO: add completions, and maybe get rid of Reedline dependency
     // once our own editing capabilities are up to the task?
 
@@ -253,8 +254,7 @@ pub fn get_command(stub: Option<String>) -> Option<(String, String)> {
         if cmd.is_empty() {
             return None
         }
-        let (command, args) = cmd.split_once(' ').unwrap_or((&cmd, ""));
-        Some((command.to_string(), args.to_string()))
+        Some(cmd)
     } else {
         None
     }
