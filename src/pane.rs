@@ -262,9 +262,6 @@ impl Pane {
 
     pub fn cut(&mut self) -> Vec<String> {
         let edits = EditBatch::cut(&self.cursors, &self.content);
-        for cursor in self.cursors.iter_mut() {
-            cursor.deselect();
-        }
         let clips = edits.iter().filter_map(|edit| {
             if let crate::editing::Edit::Delete(range) = edit {
                 Some(self.content.slice(range).to_string())
@@ -273,6 +270,9 @@ impl Pane {
             }
         }).collect();
         self.apply_editbatch(edits);
+        for cursor in self.cursors.iter_mut() {
+            cursor.deselect();
+        }
         clips
     }
 
@@ -294,31 +294,31 @@ impl Pane {
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);
+                self.apply_editbatch(edits);
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
                 }
-                self.apply_editbatch(edits);
             }
             PaneAction::DeleteBackward => {
                 let edits = EditBatch::delete_backward_with_cursors(&self.cursors, &self.content);
+                self.apply_editbatch(edits);
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
                 }
-                self.apply_editbatch(edits);
             }
             PaneAction::DeleteForward => {
                 let edits = EditBatch::delete_forward_with_cursors(&self.cursors, &self.content);
+                self.apply_editbatch(edits);
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
                 }
-                self.apply_editbatch(edits);
             }
             PaneAction::DeleteWord => {
                 let edits = EditBatch::delete_word_with_cursors(&self.cursors, &self.content);
+                self.apply_editbatch(edits);
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
                 }
-                self.apply_editbatch(edits);
             }
             PaneAction::Indent => {
                 let indent = self.settings.indent_as_string();
