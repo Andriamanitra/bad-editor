@@ -383,6 +383,23 @@ impl Cursor {
             }
         }
     }
+
+    fn pos(&self) -> ByteOffset {
+        if let Some(sel) = self.selection_from {
+            sel.min(self.offset)
+        } else {
+            self.offset
+        }
+    }
+
+    pub fn current_line_indentation(&self, content: &RopeBuffer) -> String {
+        let line_start = Cursor::new_with_offset(self.pos()).line_start(content);
+        content
+            .bytes_at(line_start)
+            .take_while(|&byte| byte == b' ' || byte == b'\t')
+            .map(|byte| byte as char)
+            .collect()
+    }
 }
 
 #[cfg(test)]

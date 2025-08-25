@@ -56,6 +56,19 @@ impl EditBatch {
         Self::from_edits(edits)
     }
 
+    pub fn insert_newline_keep_indent(cursors: &MultiCursor, content: &RopeBuffer, eol: &str) -> EditBatch {
+        let mut edits = vec![];
+        for cursor in cursors.iter() {
+            let indent = cursor.current_line_indentation(content);
+            let ins = format!("{eol}{indent}");
+            edits.push(Edit::insert_str(cursor.offset, &ins));
+            if let Some(selection) = cursor.selection() {
+                edits.push(Edit::Delete(selection));
+            }
+        }
+        Self::from_edits(edits)
+    }
+
     pub fn insert_from_clipboard(cursors: &MultiCursor, clips: &[String]) -> Self {
         if clips.len() == cursors.cursor_count() {
             let mut edits = vec![];

@@ -17,6 +17,7 @@ pub enum PaneAction {
     SelectTo(MoveTarget),
     SelectAll,
     Insert(String),
+    InsertNewline,
     DeleteBackward,
     DeleteForward,
     DeleteWord,
@@ -37,10 +38,21 @@ pub enum PaneAction {
 }
 
 #[derive(Debug)]
+pub enum AutoIndent {
+    /// Do not automatically insert any indentation
+    None,
+    /// Keep the current indentation level when a newline is inserted
+    Keep,
+    // TODO: smart indent
+}
+
+#[derive(Debug)]
 pub struct PaneSettings {
     pub tab_width: usize,
     pub indent_kind: IndentKind,
     pub indent_width: usize,
+    pub end_of_line: &'static str,
+    pub autoindent: AutoIndent,
 }
 
 impl PaneSettings {
@@ -83,6 +95,14 @@ impl PaneSettings {
                     IndentSize::Value(n) => n,
                 };
             }
+
+            if let Ok(eol) = props.get::<EndOfLine>() {
+                settings.end_of_line = match eol {
+                    EndOfLine::Lf => "\n",
+                    EndOfLine::CrLf => "\r\n",
+                    EndOfLine::Cr => "\r",
+                }
+            }
         }
         settings
     }
@@ -94,6 +114,8 @@ impl std::default::Default for PaneSettings {
             tab_width: 4,
             indent_kind: IndentKind::Spaces,
             indent_width: 4,
+            end_of_line: "\n",
+            autoindent: AutoIndent::Keep,
         }
     }
 }
@@ -339,6 +361,17 @@ impl Pane {
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);
+                self.apply_editbatch(edits);
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                }
+            }
+            PaneAction::InsertNewline => {
+                let eol = self.settings.end_of_line;
+                let edits = match self.settings.autoindent {
+                    AutoIndent::None => EditBatch::insert_with_cursors(&self.cursors, eol),
+                    AutoIndent::Keep => EditBatch::insert_newline_keep_indent(&self.cursors, &self.content, eol),
+                };
                 self.apply_editbatch(edits);
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
