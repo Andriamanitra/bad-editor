@@ -79,6 +79,9 @@ impl App {
             Action::Resize(_columns, _rows) => {
                 // this event is handled in App::run
             }
+            Action::Command(cmd) => {
+                self.handle_command(&cmd);
+            }
             Action::CommandPrompt => {
                 self.info.take();
                 self.command_prompt_with(None);
