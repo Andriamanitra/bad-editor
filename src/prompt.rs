@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::process::Command;
 
 use nu_ansi_term::{Color, Style};
 use reedline::{
@@ -98,6 +99,49 @@ impl App {
                     });
                 } else {
                     self.inform(format!("to error: {arg:?} is not a valid transformation"));
+                }
+            }
+            "ex" | "exec" | "execute" => {
+                // TODO: support args
+                fn get_command_for_file(fpath: &std::path::Path, filetype: &str) -> Option<Command> {
+                    // TODO: these should come from a config file
+                    match filetype {
+                        "bash" => {
+                            let mut command = Command::new("bash");
+                            command.arg(fpath);
+                            Some(command)
+                        }
+                        "haskell" => {
+                            let mut command = Command::new("runhaskell");
+                            command.arg(fpath);
+                            Some(command)
+                        }
+                        "python" => {
+                            let mut command = Command::new("uv");
+                            command.arg("run");
+                            command.arg(fpath);
+                            Some(command)
+                        }
+                        "ruby" => {
+                            let mut command = Command::new("ruby");
+                            command.arg(fpath);
+                            Some(command)
+                        }
+                        "rust" => {
+                            let mut command = Command::new("cargo");
+                            command.arg("run");
+                            Some(command)
+                        }
+                        _ => None
+                    }
+                }
+                if let Some(fpath) = &self.current_pane().path {
+                    let ft = self.current_pane().filetype();
+                    if let Some(command) = get_command_for_file(fpath, ft) {
+                        let _ = crate::exec::execute_interactive_command(command);
+                    } else {
+                        self.inform(format!("exec error: no exec command for ft:{ft}"));
+                    }
                 }
             }
             "lint" => {
@@ -201,7 +245,7 @@ pub fn get_command(stub: Option<String>) -> Option<String> {
     );
 
     let commands = vec![
-        "exit".into(),
+        "exec".into(),
         "find".into(),
         "goto".into(),
         "insertchar".into(),

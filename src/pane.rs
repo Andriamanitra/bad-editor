@@ -152,6 +152,16 @@ impl Pane {
         self.info.as_ref().map(|s| s.as_ref())
     }
 
+    /// Returns the current filetype as a string, eg. "plain" or "c++"
+    pub fn filetype(&self) -> &str {
+        // Note that the render function temporarily takes ownership of the highlighter
+        // so this function always returns "plain" when rendering a frame is in progress!
+        match &self.highlighter {
+            Some(hl) => hl.ft(),
+            None => "plain",
+        }
+    }
+
     pub fn open_file(&mut self, fileloc: &FilePathWithOptionalLocation, hl: Arc<BadHighlighterManager>) -> std::io::Result<()> {
         let content = match std::fs::File::open(&fileloc.path) {
             Ok(file) => {

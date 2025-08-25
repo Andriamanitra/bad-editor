@@ -3,6 +3,7 @@ pub mod cli;
 mod clipboard;
 mod cursor;
 mod editing;
+mod exec;
 mod highlighter;
 mod linter;
 mod pane;
