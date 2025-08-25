@@ -65,6 +65,43 @@ impl App {
             .expect("there should always be a pane at current_pane_index")
     }
 
+    pub fn set(&mut self, setting: &str, new_value: &str) {
+        let new_value = new_value.trim();
+        // TODO: there should probably be a Setting trait for this stuff
+        match setting {
+            "ft" | "ftype" | "filetype" => {
+                let manager = self.highlighting.clone();
+                if let Err(()) = self.current_pane_mut().set_filetype(new_value, manager) {
+                    self.inform(format!("set error: {setting} must be one of {}", &self.highlighting.filetypes().join(", ")));
+                }
+            },
+            "autoindent" => {
+                self.current_pane_mut().settings.autoindent = match new_value {
+                    "off" => crate::pane::AutoIndent::None,
+                    "keep" => crate::pane::AutoIndent::Keep,
+                    _ => {
+                        self.inform("set error: autoindent must be one of: off, keep".into());
+                        return
+                    }
+                }
+            },
+            "eol" => {
+                self.current_pane_mut().settings.end_of_line = match new_value {
+                    "lf" => "\n",
+                    "crlf" => "\r\n",
+                    "cr" => "\r",
+                    _ => {
+                        self.inform("set error: eol must be one of: lf, crlf, cr".into());
+                        return
+                    }
+                }
+            },
+            _ => {
+                self.info.replace(format!("set error: '{setting}' is not a valid setting"));
+            },
+        }
+    }
+
     pub fn handle_action(&mut self, action: Action) {
         if matches!(self.state, AppState::InPrompt) {
             return

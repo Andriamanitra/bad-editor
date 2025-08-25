@@ -202,7 +202,7 @@ impl App {
             writer.queue(Print("window too smol"))?;
         } else {
             let mut hl = self.current_pane_mut().highlighter.take().unwrap_or_else(|| {
-                BadHighlighter::new_for_file("", self.highlighting.clone())
+                BadHighlighter::for_file("", self.highlighting.clone())
             });
             self.render_content(writer, wsize, &mut hl)?;
             self.current_pane_mut().highlighter.replace(hl);

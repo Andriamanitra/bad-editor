@@ -200,7 +200,7 @@ impl Pane {
         self.content = content;
         self.cursors = MultiCursor::new();
         self.lints.clear();
-        self.highlighter = Some(BadHighlighter::new_for_file(&fileloc.path, hl));
+        self.highlighter = Some(BadHighlighter::for_file(&fileloc.path, hl));
         self.settings = PaneSettings::from_editorconfig(&fileloc.path);
         self.modified = false;
         if let Some(line_no) = fileloc.line {
@@ -248,6 +248,15 @@ impl Pane {
             .filter_map(|cursor| cursor.selection())
             .map(|sel| self.content.slice(&sel).to_string())
             .collect()
+    }
+
+    pub(crate) fn set_filetype(&mut self, ftype: &str, manager: Arc<BadHighlighterManager>) -> Result<(), ()> {
+        if let Some(hl) = BadHighlighter::for_filetype(ftype, manager) {
+            self.highlighter.replace(hl);
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 
     pub fn update_viewport_size(&mut self, columns: u16, rows: u16) {

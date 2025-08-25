@@ -191,6 +191,13 @@ impl App {
                     }
                 }
             },
+            "set" => {
+                if let Some((key, value)) = arg.trim_start().split_once(' ') {
+                    self.set(key, value);
+                } else {
+                    self.inform("set error: correct usage is 'set KEY VALUE'".into());
+                }
+            }
             "save" => {
                 if arg.is_empty() {
                     self.enqueue(Action::HandledByPane(PaneAction::Save));
@@ -251,6 +258,7 @@ pub fn get_command(stub: Option<String>) -> Option<String> {
         "insertchar".into(),
         "open".into(),
         "save".into(),
+        "set".into(),
         "quit".into(),
         "to lower".into(),
         "to upper".into(),

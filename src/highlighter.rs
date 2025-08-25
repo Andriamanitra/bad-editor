@@ -14,7 +14,7 @@ use syntect::highlighting::{
     ThemeItem,
     ThemeSettings,
 };
-use syntect::parsing::{ParseState, ScopeStack, SyntaxSet};
+use syntect::parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet};
 
 use crate::ropebuffer::RopeBuffer;
 
@@ -74,6 +74,10 @@ impl BadHighlighterManager {
         Self { theme, syntax_set }
     }
 
+    pub fn filetypes(&self) -> Vec<&str> {
+        self.syntax_set.syntaxes().iter().filter(|syn| syn.name != "Plain Text").map(|syn| syn.name.as_str()).collect()
+    }
+
     fn highlighter<'a>(&'a self) -> Highlighter<'a> {
         Highlighter::new(&self.theme)
     }
@@ -103,11 +107,20 @@ pub struct BadHighlighter {
 }
 
 impl BadHighlighter {
-    pub fn new_for_file(file_path: &str, manager: Arc<BadHighlighterManager>) -> Self {
+    pub fn for_file(file_path: &str, manager: Arc<BadHighlighterManager>) -> Self {
         let syntax = match manager.syntax_set.find_syntax_for_file(file_path) {
             Ok(Some(s)) => s,
             _ => manager.syntax_set.find_syntax_plain_text(),
         };
+        BadHighlighter::for_syntax(syntax, manager.clone())
+    }
+
+    pub fn for_filetype(filetype: &str, manager: Arc<BadHighlighterManager>) -> Option<Self> {
+        let syntax = manager.syntax_set.find_syntax_by_name(filetype)?;
+        Some(BadHighlighter::for_syntax(syntax, manager.clone()))
+    }
+
+    fn for_syntax(syntax: &SyntaxReference, manager: Arc<BadHighlighterManager>) -> Self {
         let highlighter = Highlighter::new(&manager.theme);
         let initial_parse_state = ParseState::new(syntax);
         let parse_state = initial_parse_state.clone();
