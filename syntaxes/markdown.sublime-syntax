@@ -9,7 +9,7 @@
 #
 # The scope suffix should indicate which flavor of Markdown the feature came from,
 # to help make this syntax definition easier to maintain.
-name: Markdown
+name: md
 scope: text.html.markdown
 version: 2
 
