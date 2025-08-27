@@ -14,6 +14,7 @@ use crate::{ByteOffset, IndentKind, MoveTarget, MultiCursor};
 #[derive(Debug, Clone)]
 pub enum PaneAction {
     MoveTo(MoveTarget),
+    SpawnMultiCursorTo(MoveTarget),
     SelectTo(MoveTarget),
     SelectAll,
     Insert(String),
@@ -357,6 +358,21 @@ impl Pane {
             PaneAction::MoveTo(target) => {
                 self.cursors.move_to(&self.content, target);
                 self.adjust_viewport();
+            }
+            PaneAction::SpawnMultiCursorTo(target) => {
+                for cursor in self.cursors.iter_mut() {
+                    cursor.deselect();
+                }
+                let new_cursors: Vec<Cursor> = self.cursors.iter().map(|cursor| {
+                    let mut new = *cursor;
+                    new.move_to(&self.content, target);
+                    new
+                }).collect();
+                for cursor in new_cursors {
+                    if self.cursors.spawn_new(cursor) {
+                        self.adjust_viewport_to_show_line(cursor.current_line_number(&self.content));
+                    }
+                }
             }
             PaneAction::SelectTo(target) => {
                 self.cursors.select_to(&self.content, target);

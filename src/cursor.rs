@@ -32,9 +32,22 @@ impl MultiCursor {
         self.cursors.len()
     }
 
-    pub fn spawn_new_primary(&mut self, new: Cursor) {
-        self.cursors.push(new);
-        self.primary_index = self.cursors.len() - 1;
+    pub fn spawn_new_primary(&mut self, new: Cursor) -> bool {
+        if self.spawn_new(new) {
+            self.primary_index = self.cursors.len() - 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn spawn_new(&mut self, new: Cursor) -> bool {
+        if self.cursors.iter().all(|old| old.offset != new.offset) {
+            self.cursors.push(new);
+            true
+        } else {
+            false
+        }
     }
 
     // TODO: i don't like this API, it's unsafe
