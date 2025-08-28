@@ -43,6 +43,7 @@ fn parse_target(s: &str) -> Option<MoveTarget> {
 
 impl App {
     pub fn handle_command(&mut self, s: &str) {
+        self.clear_status_msg();
         if let Some(shell_command) = s.strip_prefix("|") {
             self.current_pane_mut().pipe_through_shell_command(shell_command);
             return
@@ -132,7 +133,7 @@ impl App {
                             command.arg("run");
                             Some(command)
                         }
-                        _ => None
+                        _ => None,
                     }
                 }
                 if let Some(fpath) = &self.current_pane().path {
@@ -190,7 +191,7 @@ impl App {
                         });
                     }
                 }
-            },
+            }
             "set" => {
                 if let Some((key, value)) = arg.trim_start().split_once(' ') {
                     self.set(key, value);
