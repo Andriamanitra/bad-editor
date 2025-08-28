@@ -167,12 +167,16 @@ impl Pane {
         self.clear_status_msg();
     }
 
+    pub fn status_msg(&self) -> Option<&str> {
+        self.info.as_ref().map(|s| s.as_ref())
+    }
+
     pub fn clear_status_msg(&mut self) {
         self.info.take();
     }
 
-    pub fn status_msg(&self) -> Option<&str> {
-        self.info.as_ref().map(|s| s.as_ref())
+    pub fn inform(&mut self, msg: String) {
+        self.info.replace(msg);
     }
 
     /// Returns the current filetype as a string, eg. "plain" or "c++"
@@ -215,16 +219,10 @@ impl Pane {
     }
 
     fn save_as(&mut self, path: impl AsRef<Path>) {
-        macro_rules! status_msg {
-            ($fmtmsg:expr) => {
-                self.info.replace(format!($fmtmsg))
-            };
-        }
-
         let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(true).open(&path) {
             Ok(file) => file,
             Err(err) => {
-                status_msg!("Unable to save: {err}");
+                self.inform(format!("Unable to save: {err}"));
                 return
             }
         };
@@ -235,10 +233,10 @@ impl Pane {
             Ok(n) => {
                 self.modified = false;
                 let quoted_path = crate::quote_path(&path.as_ref().to_string_lossy());
-                status_msg!("Saved {quoted_path} ({n} bytes)");
+                self.inform(format!("Saved {quoted_path} ({n} bytes)"));
             }
             Err(err) => {
-                status_msg!("Unable to save: {err}");
+                self.inform(format!("Unable to save: {err}"));
             }
         }
     }
@@ -485,7 +483,7 @@ impl Pane {
                     self.save_as(&path);
                     self.path.replace(path);
                 } else {
-                    self.info.replace("Unable to save: no path specified".into());
+                    self.inform("Unable to save: no path specified".into());
                 }
             }
             PaneAction::SaveAs(path) => {

@@ -49,6 +49,13 @@ impl App {
         }
     }
 
+    pub fn clear_status_msg(&mut self) {
+        self.info.take();
+        for pane in self.panes.iter_mut() {
+            pane.clear_status_msg();
+        }
+    }
+    
     pub fn inform(&mut self, msg: String) {
         self.info.replace(msg);
     }
