@@ -292,6 +292,7 @@ impl App {
             if lineno > last_visible_lineno {
                 break
             }
+            let one_based_lineno = 1 + lineno;
             let line = line.to_string();
             ctx.visible_from_column = 0;
             ctx.current_column = 0;
@@ -321,7 +322,7 @@ impl App {
             }
 
             // render cursor at the end of the file
-            if 1 + lineno >= content.len_lines() && {
+            if one_based_lineno >= content.len_lines() && {
                 let content_end_offset = ByteOffset(content.len_bytes());
                 current_pane.cursors.iter().any(|cur| !cur.has_selection() && cur.offset == content_end_offset)
             } {
@@ -333,13 +334,10 @@ impl App {
             // render line numbers
             {
                 let left_scroll_indicator = if ctx.visible_from_column > 0 { '<' } else { ' ' };
-                let sidebar = format!(" {:width$}{}", 1 + lineno, left_scroll_indicator, width=max_lineno_width);
+                let sidebar = format!(" {one_based_lineno:max_lineno_width$}{left_scroll_indicator}");
                 let mut lineno_style = lineno_style;
-                if current_pane.lints.iter().any(|lint| lint.lineno == lineno) {
-                    let lints = current_pane.lints.iter().filter(|l| l.lineno == lineno);
-                    for lint in lints {
-                        lineno_style = lineno_style.with(lint.color());
-                    }
+                for lint in current_pane.lints.iter().filter(|lint| lint.lineno() == one_based_lineno) {
+                    lineno_style = lineno_style.with(lint.color());
                 }
                 writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;
             }
@@ -367,9 +365,8 @@ impl App {
             console_row += 1;
 
             // render possible lints
-            if primary_cursor_span.contains(&lineno) && current_pane.lints.iter().any(|lint| lint.lineno == lineno) {
-                let lints = current_pane.lints.iter().filter(|l| l.lineno == lineno);
-                for lint in lints {
+            if primary_cursor_span.contains(&lineno) {
+                for lint in current_pane.lints.iter().filter(|lint| lint.lineno() == one_based_lineno) {
                     writer.queue(PrintStyledContent(ContentStyle::new().on(lint.color()).apply(" ".repeat(max_lineno_width + 2))))?;
                     writer.queue(PrintStyledContent(default_style.on(LIGHTER_BG).apply(&lint.message)))?;
                     writer.queue(crossterm::style::SetStyle(default_style.on(LIGHTER_BG)))?;

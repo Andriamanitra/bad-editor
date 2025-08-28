@@ -146,16 +146,33 @@ impl App {
                 }
             }
             "lint" => {
+                if self.current_pane().modified {
+                    self.inform("lint error: save your changes before linting".into());
+                    return
+                }
                 self.current_pane_mut().lints.clear();
-                // TODO: pick linter based on file type
-                match crate::linter::run_linter_command("rust") {
-                    Ok(lints_by_filename) => {
-                        // TODO: add lints for panes other than the current one
-                        for (fname, lints) in lints_by_filename.into_iter() {
-                            if self.current_pane().path.as_ref().is_some_and(|p| p == &fname) {
-                                self.current_pane_mut().lints = lints;
+                // TODO: run the linter asynchronously in the background
+                let fname = self.current_pane().path.as_ref().and_then(|p| p.to_str());
+                let ft = self.current_pane().filetype();
+                match crate::linter::run_linter_command(fname, ft) {
+                    Ok(mut lints_by_filename) => {
+                        for pane in self.panes.iter_mut() {
+                            if let Some(path) = &pane.path {
+                                if let Some(lints) = lints_by_filename.remove(path) {
+                                    if let Some(first_error_loc) = lints
+                                        .iter()
+                                        .find_map(|lint| if lint.is_error() { lint.location() } else { None })
+                                    {
+                                        pane.cursors.esc();
+                                        pane.cursors.primary_mut().move_to(&pane.content, first_error_loc);
+                                        pane.adjust_viewport();
+                                    }
+                                    pane.inform(format!("linted ({} lint(s) in current file)", lints.len()));
+                                    pane.lints = lints;
+                                }
                             }
                         }
+                        self.inform("linted".into());
                     }
                     Err(err) => {
                         self.inform(format!("linter error: {err:?}"));

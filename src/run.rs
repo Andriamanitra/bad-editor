@@ -150,6 +150,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('h') if ctrl => Action::HandledByPane(PaneAction::DeleteWord),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
                 KeyCode::F(5) => Action::Command("exec".into()),
+                KeyCode::F(6) => Action::Command("lint".into()),
                 KeyCode::Esc => Action::Esc,
                 _ => Action::SetInfo(format!("{kevent:?}")),
             }
