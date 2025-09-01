@@ -200,7 +200,7 @@ impl Pane {
             Err(err) if err.kind() == ErrorKind::NotFound => RopeBuffer::new(),
             Err(err) => return Err(err),
         };
-        self.title = fileloc.path.clone();
+        self.title = crate::quote_path(&fileloc.path);
         self.path = Some(PathBuf::from(&fileloc.path));
         self.content = content;
         self.cursors = MultiCursor::new();
@@ -227,7 +227,7 @@ impl Pane {
             }
         };
 
-        self.title = path.as_ref().to_string_lossy().to_string();
+        self.title = crate::quote_path(&path.as_ref().to_string_lossy());
         self.path.replace(path.as_ref().into());
         match self.content.write_to(file) {
             Ok(n) => {
