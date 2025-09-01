@@ -17,6 +17,174 @@ use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::{Action, App, MoveTarget, PaneAction, quote_path};
 
+pub enum Arg {
+    String,
+    File,
+    OneOf(Vec<&'static str>),
+}
+
+#[derive(Default)]
+pub struct Cmd {
+    prefixes: Vec<&'static str>,
+    args: Vec<Arg>,
+    help: &'static str,
+}
+
+impl Cmd {
+    fn has_alias(&self, alias: &str) -> bool {
+        self.prefixes.contains(&alias)
+    }
+
+    fn n_args(&self) -> usize{
+        self.args.len()
+    }
+
+    fn primary_name(&self) -> &'static str {
+        self.prefixes[0]
+    }
+}
+
+pub struct CmdBuilder {
+    cmd: Cmd,
+}
+
+impl CmdBuilder {
+    pub fn new(prefix: &'static str) -> Self {
+        Self { cmd: Cmd { prefixes: vec![prefix], ..Default::default() } }
+    }
+
+    pub fn alias(mut self, prefix: &'static str) -> Self {
+        self.cmd.prefixes.push(prefix);
+        self
+    }
+
+    pub fn arg(mut self, a: Arg) -> Self {
+        self.cmd.args.push(a);
+        self
+    }
+
+    pub fn help(mut self, help: &'static str) -> Self {
+        self.cmd.help = help;
+        self
+    }
+
+    pub fn build(self) -> Cmd {
+        self.cmd
+    }
+}
+
+struct CmdCompleter {
+    cmds: Vec<Cmd>
+}
+
+impl CmdCompleter {
+    fn new(cmds: Vec<Cmd>) -> CmdCompleter {
+        CmdCompleter { cmds }
+    }
+}
+
+impl reedline::Completer for CmdCompleter {
+    fn complete(&mut self, line: &str, pos: usize) -> Vec<reedline::Suggestion> {
+        let input = &line[..pos];
+        let mut parts: Vec<&str> = input.split_ascii_whitespace().collect();
+        if parts.is_empty() || input.ends_with(|c: char| c.is_ascii_whitespace()) {
+            parts.push("");
+        }
+
+        let first = parts[0];
+        let Some(cmd) = self.cmds.iter().find(|cmd| cmd.has_alias(first)) else {
+            return self.cmds.iter()
+                .filter(|cmd| cmd.primary_name().starts_with(first))
+                .map(|cmd|
+                    reedline::Suggestion {
+                        value: cmd.primary_name().to_string(),
+                        description: Some(cmd.help.to_string()),
+                        extra: None,
+                        style: None,
+                        span: reedline::Span { start: 0, end: pos },
+                        append_whitespace: cmd.n_args() > 0,
+                    }
+                )
+                .collect()
+        };
+
+        let Some(arg_index) = parts.len().checked_sub(2) else {
+            // when completing a valid command with nothing after it we want to
+            // a) turn alias into the primary name (eg. ":q" -> "quit")
+            // b) insert a space if the command takes args, eg. "open" -> "open "
+            return vec![reedline::Suggestion {
+                value: cmd.primary_name().to_string(),
+                span: reedline::Span { start: 0, end: pos },
+                append_whitespace: cmd.n_args() > 0,
+                ..Default::default()
+            }]
+        };
+
+        let Some(arg) = cmd.args.get(arg_index) else {
+            return vec![]
+        };
+
+        let arg_prefix = parts.last().unwrap_or(&"");
+
+        match arg {
+            Arg::String => vec![],
+            Arg::OneOf(choices) => choices.iter()
+                .filter(|s| s.starts_with(arg_prefix))
+                .map(|s| reedline::Suggestion {
+                    value: s.to_string(),
+                    description: None,
+                    extra: None,
+                    style: None,
+                    span: reedline::Span { start: pos - arg_prefix.len(), end: pos },
+                    append_whitespace: cmd.n_args() > arg_index + 1,
+                })
+                .collect(),
+            Arg::File => {
+                let mut suggestions = Vec::new();
+
+                let (dir, file_prefix) = match arg_prefix.rsplit_once('/') {
+                    Some((dir, file_prefix)) => (dir, file_prefix),
+                    None if arg_prefix == &"~" => ("~", ""),
+                    None => (".", *arg_prefix),
+                };
+
+                let dir = crate::expand_path(dir);
+
+                if let Ok(entries) = std::fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        if let Some(name) = entry.file_name().to_str() {
+                            if name.starts_with(file_prefix) {
+                                let mut val = if arg_prefix == &"~" {
+                                    format!("/{name}")
+                                } else {
+                                    name.to_string()
+                                };
+                                if entry.file_type().is_ok_and(|e| e.is_dir()) {
+                                    val.push('/');
+                                }
+                                suggestions.push(reedline::Suggestion {
+                                    value: val,
+                                    description: None,
+                                    extra: None,
+                                    style: None,
+                                    span: reedline::Span {
+                                        start: pos - file_prefix.len(),
+                                        end: pos,
+                                    },
+                                    append_whitespace: false,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                suggestions
+            }
+        }
+    }
+}
+
+
 fn parse_insertchar(s: &str) -> Option<char> {
     if let Some(s_hexadecimal) = s.strip_prefix("U+") {
         u32::from_str_radix(s_hexadecimal, 16).ok().and_then(char::from_u32)
@@ -237,9 +405,6 @@ impl App {
 }
 
 pub fn get_command(stub: Option<String>) -> Option<String> {
-    // TODO: add completions, and maybe get rid of Reedline dependency
-    // once our own editing capabilities are up to the task?
-
     macro_rules! edits {
         ( $( $x:expr ),* $(,)? ) => {
             ReedlineEvent::Edit(vec![ $( $x ),* ])
@@ -270,22 +435,38 @@ pub fn get_command(stub: Option<String>) -> Option<String> {
         ]),
     );
 
-    let commands = vec![
-        "exec".into(),
-        "find".into(),
-        "goto".into(),
-        "insertchar".into(),
-        "open".into(),
-        "save".into(),
-        "set".into(),
-        "quit".into(),
-        "to lower".into(),
-        "to upper".into(),
-        "to quoted".into(),
-        "to list".into(),
-    ];
-
-    let completer = reedline::DefaultCompleter::new_with_wordlen(commands, 1);
+    let completer = CmdCompleter::new(vec![
+        CmdBuilder::new("exec").alias("execute")
+            .help("exec")
+            .build(),
+        CmdBuilder::new("find").arg(Arg::String)
+            .help("find STR")
+            .build(),
+        CmdBuilder::new("goto").arg(Arg::String)
+            .help("goto LINE[:COL]")
+            .build(),
+        CmdBuilder::new("insertchar").alias("c").arg(Arg::String)
+            .help("insertchar CODEPOINT[, CODEPOINT]...")
+            .build(),
+        CmdBuilder::new("lint")
+            .help("lint")
+            .build(),
+        CmdBuilder::new("open").arg(Arg::File)
+            .help("open FILE")
+            .build(),
+        CmdBuilder::new("save").arg(Arg::File)
+            .help("save [FILE]")
+            .build(),
+        CmdBuilder::new("set").arg(Arg::OneOf(vec!["ftype", "autoindent", "eol"])).arg(Arg::String)
+            .help("set KEY VALUE")
+            .build(),
+        CmdBuilder::new("quit").alias(":q").alias("exit").alias("q")
+            .help("quit")
+            .build(),
+        CmdBuilder::new("to").arg(Arg::OneOf(vec!["lower", "upper", "quoted", "list"]))
+            .help("to (lower|upper|quoted|list)")
+            .build(),
+    ]);
 
     let completion_menu =
         reedline::ReedlineMenu::EngineCompleter(
