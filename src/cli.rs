@@ -6,16 +6,22 @@ use clap::{Arg, Command};
 
 #[derive(Debug, Clone)]
 pub struct FilePathWithOptionalLocation {
-    pub path: String,
+    pub path: PathBuf,
     pub line: Option<NonZeroUsize>,
     pub column: Option<NonZeroUsize>,
 }
 
 impl FilePathWithOptionalLocation {
-    pub fn parse_from_str(arg: &str) -> Self {
-        if PathBuf::from(arg).exists() {
+    pub fn parse_from_str(arg: &str, expand_path: bool) -> Self {
+        let to_path = if expand_path {
+            |s: &str| crate::expand_path(s)
+        } else {
+            |s: &str| PathBuf::from(s)
+        };
+
+        if to_path(arg).exists() {
             return FilePathWithOptionalLocation {
-                path: String::from(arg),
+                path: to_path(arg),
                 line: None,
                 column: None,
             }
@@ -25,21 +31,21 @@ impl FilePathWithOptionalLocation {
                 if let Some((pre2, num)) = pre1.rsplit_once(':') {
                     if let Ok(num_second_last) = num.parse() {
                         return FilePathWithOptionalLocation {
-                            path: String::from(pre2),
+                            path: to_path(pre2),
                             line: Some(num_second_last),
                             column: Some(num_last),
                         }
                     }
                 }
                 return FilePathWithOptionalLocation {
-                    path: String::from(pre1),
+                    path: to_path(pre1),
                     line: Some(num_last),
                     column: None,
                 }
             }
         }
         FilePathWithOptionalLocation {
-            path: String::from(arg),
+            path: to_path(arg),
             line: None,
             column: None,
         }
@@ -48,7 +54,7 @@ impl FilePathWithOptionalLocation {
 
 pub fn parse_cli_args() -> clap::ArgMatches {
     let open_file_at_loc_parser =
-        StringValueParser::new().map(|p| FilePathWithOptionalLocation::parse_from_str(&p));
+        StringValueParser::new().map(|p| FilePathWithOptionalLocation::parse_from_str(&p, false));
 
     Command::new("bad")
         .version("0.1")

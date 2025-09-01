@@ -107,7 +107,7 @@ pub struct BadHighlighter {
 }
 
 impl BadHighlighter {
-    pub fn for_file(file_path: &str, manager: Arc<BadHighlighterManager>) -> Self {
+    pub fn for_file<P: AsRef<std::path::Path>>(file_path: P, manager: Arc<BadHighlighterManager>) -> Self {
         let syntax = match manager.syntax_set.find_syntax_for_file(file_path) {
             Ok(Some(s)) => s,
             _ => manager.syntax_set.find_syntax_plain_text(),

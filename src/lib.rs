@@ -96,3 +96,20 @@ pub fn quote_path(s: &str) -> String {
     }
     format!("{s:?}")
 }
+
+/// Expands ~ to `$HOME` if `$HOME` is defined
+pub fn expand_path(path: &str) -> std::path::PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        match std::env::var_os("HOME") {
+            Some(homedir) => std::path::PathBuf::from(homedir).join(rest),
+            None => path.into(),
+        }
+    } else if path == "~" {
+        match std::env::var_os("HOME") {
+            Some(homedir) => std::path::PathBuf::from(homedir),
+            None => "~".into(),
+        }
+    } else {
+        path.into()
+    }
+}

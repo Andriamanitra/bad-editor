@@ -197,7 +197,7 @@ impl App {
             }
             "open" => {
                 let hl = self.highlighting.clone();
-                match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(arg), hl) {
+                match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(arg, true), hl) {
                     Ok(()) => {},
                     Err(err) => {
                         let fpath = quote_path(arg);
@@ -220,7 +220,7 @@ impl App {
                 if arg.is_empty() {
                     self.enqueue(Action::HandledByPane(PaneAction::Save));
                 } else {
-                    self.enqueue(Action::HandledByPane(PaneAction::SaveAs(arg.into())));
+                    self.enqueue(Action::HandledByPane(PaneAction::SaveAs(crate::expand_path(arg))));
                 }
             }
             _ => self.inform(format!("Unknown command '{command}'")),

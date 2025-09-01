@@ -200,7 +200,7 @@ impl Pane {
             Err(err) if err.kind() == ErrorKind::NotFound => RopeBuffer::new(),
             Err(err) => return Err(err),
         };
-        self.title = crate::quote_path(&fileloc.path);
+        self.title = crate::quote_path(&fileloc.path.to_string_lossy());
         self.path = Some(PathBuf::from(&fileloc.path));
         self.content = content;
         self.cursors = MultiCursor::new();
