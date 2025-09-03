@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::io::ErrorKind;
 use std::sync::Arc;
 
 use crate::cli::FilePathWithOptionalLocation;
@@ -39,9 +40,16 @@ impl App {
         }
     }
 
-    pub fn open_file_pane(&mut self, file_loc: &FilePathWithOptionalLocation) -> std::io::Result<()> {
+    pub fn open_file_pane(&mut self, file_loc: &FilePathWithOptionalLocation) {
         let highlighting = self.highlighting.clone();
-        self.current_pane_mut().open_file(file_loc, highlighting)
+        if let Err(err) = self.current_pane_mut().open_file(file_loc, highlighting) {
+            let fpath = crate::quote_path(file_loc.path.to_string_lossy().as_ref());
+            self.current_pane_mut().inform(match err.kind() {
+                ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
+                ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
+                _ => format!("{err}: {fpath}"),
+            });
+        }
     }
 
     pub fn status_msg(&self) -> Option<&str> {
@@ -151,6 +159,16 @@ impl App {
             Action::Paste => {
                 let clips = self.clipboard.content().to_vec();
                 self.current_pane_mut().insert_from_clipboard(&clips);
+            }
+            Action::Save => {
+                self.current_pane_mut().save();
+            }
+            Action::SaveAs(path) => {
+                let hl = self.highlighting.clone();
+                self.current_pane_mut().save_as(&path, hl);
+            }
+            Action::Open(path) => {
+                self.open_file_pane(&path);
             }
         }
     }

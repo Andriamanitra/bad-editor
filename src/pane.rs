@@ -32,8 +32,6 @@ pub enum PaneAction {
     RepeatFind,
     RepeatFindBackward,
     QuickAddNext,
-    Save,
-    SaveAs(PathBuf),
     ScrollDown(usize),
     ScrollUp(usize),
 }
@@ -218,26 +216,46 @@ impl Pane {
         Ok(())
     }
 
-    fn save_as(&mut self, path: impl AsRef<Path>) {
-        let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(true).open(&path) {
-            Ok(file) => file,
-            Err(err) => {
-                self.inform(format!("Unable to save: {err}"));
-                return
-            }
-        };
+    fn set_path(&mut self, path: impl AsRef<Path>, hl: Arc<BadHighlighterManager>) -> std::io::Result<()> {
+        if let Err(err) = std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(false).open(&path) {
+            self.inform(format!("Unable to save: {err}"));
+            return Err(err)
+        }
+        if self.path.as_ref().is_none_or(|old_path| old_path != path.as_ref()) {
+            self.path.replace(path.as_ref().into());
+            self.highlighter.replace(BadHighlighter::for_file(&path, hl));
+            self.title = crate::quote_path(&path.as_ref().to_string_lossy());
+        }
+        Ok(())
+    }
 
-        self.title = crate::quote_path(&path.as_ref().to_string_lossy());
-        self.path.replace(path.as_ref().into());
-        match self.content.write_to(file) {
-            Ok(n) => {
-                self.modified = false;
-                let quoted_path = crate::quote_path(&path.as_ref().to_string_lossy());
-                self.inform(format!("Saved {quoted_path} ({n} bytes)"));
+    pub(crate) fn save(&mut self) {
+        if let Some(path) = self.path.as_ref() {
+            let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(true).open(path) {
+                Ok(file) => file,
+                Err(err) => {
+                    self.inform(format!("Unable to save: {err}"));
+                    return
+                }
+            };
+            match self.content.write_to(file) {
+                Ok(n) => {
+                    self.modified = false;
+                    let quoted_path = crate::quote_path(path.to_string_lossy().as_ref());
+                    self.inform(format!("Saved {quoted_path} ({n} bytes)"));
+                }
+                Err(err) => {
+                    self.inform(format!("Unable to save: {err}"));
+                } 
             }
-            Err(err) => {
-                self.inform(format!("Unable to save: {err}"));
-            }
+        } else {
+            self.inform("Unable to save: no file specified".into());
+        }
+    }
+
+    pub(crate) fn save_as(&mut self, path: impl AsRef<Path>, hl: Arc<BadHighlighterManager>) {
+        if self.set_path(path, hl).is_ok() {
+            self.save();
         }
     }
 
@@ -477,17 +495,6 @@ impl Pane {
                     }
                     self.adjust_viewport();
                 }
-            }
-            PaneAction::Save => {
-                if let Some(path) = self.path.take() {
-                    self.save_as(&path);
-                    self.path.replace(path);
-                } else {
-                    self.inform("Unable to save: no path specified".into());
-                }
-            }
-            PaneAction::SaveAs(path) => {
-                self.save_as(path);
             }
             PaneAction::ScrollDown(n) => {
                 let new_pos = self.viewport_position_row + n;

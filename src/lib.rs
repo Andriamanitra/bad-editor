@@ -15,11 +15,14 @@ mod ropebuffer;
 mod run;
 
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 
 pub use app::App;
 pub use cursor::MultiCursor;
 pub use pane::{Pane, PaneAction};
 pub use rope_ext::RopeExt;
+
+use crate::cli::FilePathWithOptionalLocation;
 
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct ByteOffset(pub usize);
@@ -44,6 +47,9 @@ pub enum Action {
     CommandPromptEdit(String),
     SetInfo(String),
     HandledByPane(PaneAction),
+    Save,
+    SaveAs(PathBuf),
+    Open(FilePathWithOptionalLocation),
     Cut,
     Copy,
     Paste,

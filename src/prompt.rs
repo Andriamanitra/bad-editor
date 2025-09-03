@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::process::Command;
 
 use nu_ansi_term::{Color, Style};
@@ -16,7 +15,7 @@ use reedline::{
 use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::prompt_completer::CmdCompleter;
-use crate::{Action, App, MoveTarget, PaneAction, quote_path};
+use crate::{Action, App, MoveTarget, PaneAction};
 
 
 fn parse_insertchar(s: &str) -> Option<char> {
@@ -198,18 +197,8 @@ impl App {
                 }
             }
             "open" => {
-                let hl = self.highlighting.clone();
-                match self.current_pane_mut().open_file(&FilePathWithOptionalLocation::parse_from_str(arg, true), hl) {
-                    Ok(()) => {},
-                    Err(err) => {
-                        let fpath = quote_path(arg);
-                        self.inform(match err.kind() {
-                            ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
-                            ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
-                            _ => format!("{err}: {fpath}"),
-                        });
-                    }
-                }
+                let path = FilePathWithOptionalLocation::parse_from_str(arg, true);
+                self.enqueue(Action::Open(path));
             }
             "set" => {
                 if let Some((key, value)) = arg.trim_start().split_once(' ') {
@@ -220,9 +209,9 @@ impl App {
             }
             "save" => {
                 if arg.is_empty() {
-                    self.enqueue(Action::HandledByPane(PaneAction::Save));
+                    self.enqueue(Action::Save);
                 } else {
-                    self.enqueue(Action::HandledByPane(PaneAction::SaveAs(crate::expand_path(arg))));
+                    self.enqueue(Action::SaveAs(crate::expand_path(arg)));
                 }
             }
             _ => self.inform(format!("Unknown command '{command}'")),

@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = cli::parse_cli_args();
     if let Some(file_loc) = args.get_one::<cli::FilePathWithOptionalLocation>("file") {
-        app.open_file_pane(file_loc)?;
+        app.open_file_pane(file_loc);
     }
 
     // TerminalGuard ensures raw mode gets disabled if the app crashes.
