@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::clipboard::Clipboard;
 use crate::highlighter::BadHighlighterManager;
+use crate::prompt_completer::CmdCompleter;
 use crate::{Action, Pane};
 
 pub(crate) enum AppState {
@@ -17,19 +18,23 @@ pub struct App {
     pub(crate) state: AppState,
     pub(crate) action_queue: VecDeque<Action>,
     pub(crate) highlighting: Arc<BadHighlighterManager>,
+    pub(crate) prompt_completer: CmdCompleter,
     pub(crate) clipboard: Clipboard,
     info: Option<String>,
 }
 
 impl App {
     pub fn new() -> Self {
+        let highlighting = BadHighlighterManager::new();
+        let prompt_completer = CmdCompleter::make_completer(highlighting.filetypes().as_slice());
         Self {
             panes: vec![Pane::empty()],
             current_pane_index: 0,
             info: None,
             state: AppState::Idle,
             action_queue: VecDeque::new(),
-            highlighting: Arc::new(BadHighlighterManager::new()),
+            highlighting: Arc::new(highlighting),
+            prompt_completer,
             clipboard: Clipboard::new(),
         }
     }
@@ -74,9 +79,9 @@ impl App {
 
     pub fn set(&mut self, setting: &str, new_value: &str) {
         let new_value = new_value.trim();
-        // TODO: there should probably be a Setting trait for this stuff
+        // TODO: we should make it impossible to have these not match prompt_completer
         match setting {
-            "ft" | "ftype" | "filetype" => {
+            "ft" | "ftype" => {
                 let manager = self.highlighting.clone();
                 if let Err(()) = self.current_pane_mut().set_filetype(new_value, manager) {
                     self.inform(format!("set error: {setting} must be one of {}", &self.highlighting.filetypes().join(", ")));
@@ -128,11 +133,11 @@ impl App {
             }
             Action::CommandPrompt => {
                 self.info.take();
-                self.command_prompt_with(None);
+                self.command_prompt_with(None, self.prompt_completer.clone());
             }
             Action::CommandPromptEdit(stub) => {
                 self.info.take();
-                self.command_prompt_with(Some(stub));
+                self.command_prompt_with(Some(stub), self.prompt_completer.clone());
             }
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),

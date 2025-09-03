@@ -8,6 +8,7 @@ mod highlighter;
 mod linter;
 mod pane;
 mod prompt;
+mod prompt_completer;
 mod render;
 mod rope_ext;
 mod ropebuffer;
