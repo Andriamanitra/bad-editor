@@ -21,8 +21,9 @@ impl CmdCompleter {
 
         CmdCompleter {
             cmds: vec![
-                CmdBuilder::new("exec").alias("execute")
-                    .help("exec")
+                CmdBuilder::new("exec").alias("x")
+                    .args(Arg::String)
+                    .help("exec [TEMPLATE]")
                     .build(),
                 CmdBuilder::new("find")
                     .args(Arg::String)

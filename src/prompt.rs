@@ -1,5 +1,3 @@
-use std::process::Command;
-
 use nu_ansi_term::{Color, Style};
 use reedline::{
     DefaultPrompt,
@@ -14,6 +12,7 @@ use reedline::{
 
 use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
+use crate::exec::execute_interactive_command_from_template;
 use crate::prompt_completer::CmdCompleter;
 use crate::{Action, App, MoveTarget, PaneAction};
 
@@ -103,47 +102,44 @@ impl App {
                     self.inform(format!("to error: {arg:?} is not a valid transformation"));
                 }
             }
-            "ex" | "exec" | "execute" => {
-                // TODO: support args
-                fn get_command_for_file(fpath: &std::path::Path, filetype: &str) -> Option<Command> {
-                    // TODO: these should come from a config file
-                    match filetype {
-                        "bash" => {
-                            let mut command = Command::new("bash");
-                            command.arg(fpath);
-                            Some(command)
-                        }
-                        "haskell" => {
-                            let mut command = Command::new("runhaskell");
-                            command.arg(fpath);
-                            Some(command)
-                        }
-                        "python" => {
-                            let mut command = Command::new("uv");
-                            command.arg("run");
-                            command.arg(fpath);
-                            Some(command)
-                        }
-                        "ruby" => {
-                            let mut command = Command::new("ruby");
-                            command.arg(fpath);
-                            Some(command)
-                        }
-                        "rust" => {
-                            let mut command = Command::new("cargo");
-                            command.arg("run");
-                            Some(command)
-                        }
-                        _ => None,
-                    }
-                }
-                if let Some(fpath) = &self.current_pane().path {
+            "exec" | "x" => {
+                let arg = arg.trim();
+
+                let template = if !arg.is_empty() {
+                    arg
+                } else {
                     let ft = self.current_pane().filetype();
-                    if let Some(command) = get_command_for_file(fpath, ft) {
-                        let _ = crate::exec::execute_interactive_command(command);
-                    } else {
-                        self.inform(format!("exec error: no exec command for ft:{ft}"));
+                    // TODO: these should come from a config file
+                    match ft {
+                        "bash" => "bash %f",
+                        "c" => "zig run -lc %f",
+                        "c#" => "dotnet run %f",
+                        "haskell" => "runhaskell %f",
+                        "html" => "xdg-open %f",
+                        "js" => "node %f",
+                        "lua" => "lua %f",
+                        "python" => "uv run %f",
+                        "ruby" => "ruby %f",
+                        "rust" => "cargo run",
+                        _ => {
+                            self.inform(format!("exec error: no exec command for ft:{ft}"));
+                            return
+                        }
                     }
+                };
+
+                let fpath = match &self.current_pane().path {
+                    None if template.contains("%f") => {
+                        self.inform("exec error: file needs to be saved".into());
+                        return
+                    }
+                    Some(path) => path,
+                    None => std::path::Path::new(""),
+                };
+
+                match execute_interactive_command_from_template(template, fpath) {
+                    Ok(()) => {}
+                    Err(err) => self.inform(format!("{err}"))
                 }
             }
             "lint" => {

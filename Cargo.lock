@@ -100,6 +100,7 @@ dependencies = [
  "reedline",
  "ropey",
  "rstest",
+ "shlex",
  "syntect",
  "unicode-segmentation",
  "unicode-width",
