@@ -227,6 +227,51 @@ impl App {
     }
 }
 
+struct BadHinter {
+    style: Style,
+    hinter: reedline::DefaultHinter
+}
+
+impl BadHinter {
+    fn with_style(style: Style) -> Self {
+        Self {
+            style,
+            hinter: reedline::DefaultHinter::default().with_style(style)
+        }
+    }
+}
+
+impl reedline::Hinter for BadHinter {
+    fn handle(
+        &mut self,
+        line: &str,
+        pos: usize,
+        history: &dyn reedline::History,
+        use_ansi_coloring: bool,
+        cwd: &str,
+    ) -> String {
+        let hint = self.hinter.handle(line, pos, history, use_ansi_coloring, cwd);
+        if line.is_empty() {
+            let hint = "  Press Tab to browse commands";
+            if use_ansi_coloring {
+                self.style.paint(hint).to_string()
+            } else {
+                hint.to_string()
+            }
+        } else {
+            hint
+        }
+    }
+
+    fn complete_hint(&self) -> String {
+        self.hinter.complete_hint()
+    }
+
+    fn next_hint_token(&self) -> String {
+        self.hinter.next_hint_token()
+    }
+}
+
 pub fn get_command(stub: Option<String>, completer: CmdCompleter) -> Option<String> {
     macro_rules! edits {
         ( $( $x:expr ),* $(,)? ) => {
@@ -271,9 +316,7 @@ pub fn get_command(stub: Option<String>, completer: CmdCompleter) -> Option<Stri
             .expect("configuring history should be fine")
     };
 
-    let hinter =
-        reedline::DefaultHinter::default()
-            .with_style(Style::new().fg(Color::Rgb(75, 75, 75)));
+    let hinter = BadHinter::with_style(Style::new().fg(Color::Rgb(75, 75, 75)));
 
     let mut ed = Reedline::create()
         .with_completer(Box::new(completer))
