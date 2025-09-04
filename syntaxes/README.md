@@ -1,7 +1,7 @@
 # Origins of syntax files and their licenses
 
 * Plain: (built-in from syntect)
-* bash: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/ShellScript/Bash.sublime-syntax) (custom license below)
+* bash: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/759d6eed9b4beed87e602a23303a121c3a6c2fb3/ShellScript/Bash.sublime-syntax) (custom license below)
 * css: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/CSS/CSS.sublime-syntax) (custom license below)
 * c#: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/C%23/C%23.sublime-syntax) (MIT)
 * c++: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/C%2B%2B/C%2B%2B.sublime-syntax) (custom license below)
