@@ -51,19 +51,20 @@ impl CmdCompleter {
                 CmdBuilder::new("set")
                     .args(
                         argchoice![
-                            argseq!["ftype", Arg::OneOf(filetypes)],
                             argseq!["autoindent", argchoice!["off", "keep"]],
                             argseq!["eol", argchoice!["lf", "crlf", "cr"]],
+                            argseq!["ftype", Arg::OneOf(filetypes)],
+                            argseq!["debug", argchoice!["off", "scopes"]],
                         ]
                     )
                     .help("set KEY VALUE")
                     .build(),
-                CmdBuilder::new("quit").alias(":q").alias("exit").alias("q")
-                    .help("quit")
-                    .build(),
                 CmdBuilder::new("to")
                     .args(argchoice!["lower", "upper", "quoted", "list"])
                     .help("to (lower|upper|quoted|list)")
+                    .build(),
+                CmdBuilder::new("quit").alias(":q").alias("exit").alias("q")
+                    .help("quit")
                     .build(),
             ]
         }

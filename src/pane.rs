@@ -52,6 +52,7 @@ pub struct PaneSettings {
     pub indent_width: usize,
     pub end_of_line: &'static str,
     pub autoindent: AutoIndent,
+    pub debug_scopes: bool,
 }
 
 impl PaneSettings {
@@ -115,6 +116,7 @@ impl std::default::Default for PaneSettings {
             indent_width: 4,
             end_of_line: "\n",
             autoindent: AutoIndent::Keep,
+            debug_scopes: false,
         }
     }
 }

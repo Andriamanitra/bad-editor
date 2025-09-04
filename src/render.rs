@@ -219,6 +219,7 @@ impl App {
         let content = &current_pane.content;
         let primary_cursor_offset = current_pane.cursors.primary().offset;
         let primary_cursor_span = current_pane.cursors.primary().line_span(content);
+        let primary_cursor_line = current_pane.cursors.primary().current_line_number(content);
         let default_style = ContentStyle::new().with(DEFAULT_FG).on(DEFAULT_BG);
         let lineno_style = ContentStyle::new().with(LIGHT_GREY).on(LIGHTER_BG);
 
@@ -363,6 +364,20 @@ impl App {
             writer.queue(Clear(ClearType::UntilNewLine))?;
             writer.queue(MoveToNextLine(1))?;
             console_row += 1;
+
+            // render debug scopes
+            if current_pane.settings.debug_scopes && primary_cursor_line == lineno {
+                let line_start = current_pane.cursors.primary().line_start(content);
+                let primary_cursor_offset_within_line = primary_cursor_offset.0 - line_start.0;
+                let ss = hl.scope_stack_at(primary_cursor_line, primary_cursor_offset_within_line, content);
+                for scope in ss.as_slice().iter() {
+                    writer.queue(crossterm::style::SetStyle(lineno_style))?;
+                    writer.queue(Print(format!("{}· {scope}", " ".repeat(max_lineno_width))))?;
+                    writer.queue(Clear(ClearType::UntilNewLine))?;
+                    writer.queue(MoveToNextLine(1))?;
+                    console_row += 1;
+                }
+            }
 
             // render possible lints
             if primary_cursor_span.contains(&lineno) {

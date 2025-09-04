@@ -116,6 +116,13 @@ impl App {
                     }
                 }
             },
+            "debug" => {
+                match new_value {
+                    "scopes" => self.current_pane_mut().settings.debug_scopes = true,
+                    "off" => self.current_pane_mut().settings.debug_scopes = false,
+                    _ => self.inform("set error: debug must be one of: scopes, off".into()),
+                }
+            }
             _ => {
                 self.info.replace(format!("set error: '{setting}' is not a valid setting"));
             },

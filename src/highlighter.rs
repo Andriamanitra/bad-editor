@@ -96,6 +96,7 @@ pub struct CachedState {
     line_number: usize,
 }
 
+#[derive(Clone)]
 pub struct BadHighlighter {
     filetype: String,
     manager: Arc<BadHighlighterManager>,
@@ -179,6 +180,18 @@ impl BadHighlighter {
             }
             self.parse_line(&line.to_string());
         }
+    }
+
+    pub fn scope_stack_at(&self, target_line: usize, col_offset: usize, text: &RopeBuffer) -> ScopeStack {
+        // TODO: make this less stupid, currently it doubles the render times
+        // (but this is only called when debug scopes is active)
+        let mut clone = self.clone();
+        clone.skip_to_line(target_line, text);
+        let line = text.lines_at(clone.current_line).next().unwrap().to_string();
+        let ops: Vec<_> = clone.parse_state.parse_line(&line, &clone.manager.syntax_set).unwrap_or_default();
+        let pp = ops.partition_point(|(i, _)| *i <= col_offset);
+        for _ in HighlightIterator::new(&mut clone.highlight_state, &ops[..pp], &line, &clone.manager.highlighter()) {}
+        clone.highlight_state.path
     }
 
     fn parse_line(&mut self, line: &str) {
