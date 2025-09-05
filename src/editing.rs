@@ -416,4 +416,14 @@ mod tests {
         r.do_edits(&mut cursors, edits);
         assert_eq!(r.to_string(), "hello world")
     }
+
+    #[test]
+    fn test_insert_newline_keep_indent_mid_indent() {
+        let mut r = RopeBuffer::from_str("    abc");
+        let mut cursors = MultiCursor::new();
+        cursors.move_to(&r, crate::MoveTarget::Right(2));
+        let edits = EditBatch::insert_newline_keep_indent(&cursors, &r, "\n");
+        r.do_edits(&mut cursors, edits);
+        assert_eq!(r.to_string(), "  \n    abc")
+    }
 }

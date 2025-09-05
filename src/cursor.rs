@@ -408,7 +408,8 @@ impl Cursor {
     pub fn current_line_indentation(&self, content: &RopeBuffer) -> String {
         let line_start = Cursor::new_with_offset(self.pos()).line_start(content);
         content
-            .bytes_at(line_start)
+            .slice(&(line_start..self.offset))
+            .bytes()
             .take_while(|&byte| byte == b' ' || byte == b'\t')
             .map(|byte| byte as char)
             .collect()
