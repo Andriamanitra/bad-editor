@@ -42,7 +42,7 @@ impl MultiCursor {
     }
 
     pub fn spawn_new(&mut self, new: Cursor) -> bool {
-        if self.cursors.iter().all(|old| old.offset != new.offset) {
+        if self.cursors.iter().all(|old| old.offset != new.offset || old.selection_from != new.selection_from) {
             self.cursors.push(new);
             true
         } else {
