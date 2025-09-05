@@ -177,18 +177,18 @@ contexts:
 
   import-declaration:
     - match: '\bfrom\b'
-      scope: keyword.control.from.js
+      scope: keyword.control.import.js
     - match: '\bas\b'
-      scope: keyword.control.as.js
+      scope: keyword.control.import.js
     - match: '\{'
-      scope: punctuation.section.block.js
+      scope: punctuation.section.braces.js
       push: import-list
     - match: '\*'
       scope: constant.other.wildcard.asterisk.js
     - match: ','
-      scope: punctuation.separator.comma.js
+      scope: punctuation.separator.js
     - match: ';'
-      scope: punctuation.terminator.statement.js
+      scope: punctuation.terminator.js
       pop: true
     - match: '$'
       pop: true
@@ -200,9 +200,9 @@ contexts:
 
   import-list:
     - match: '\bas\b'
-      scope: keyword.control.as.js
+      scope: keyword.control.import.js
     - match: '\}'
-      scope: punctuation.section.block.js
+      scope: punctuation.section.braces.js
       pop: true
     - include: keywords
     - include: strings
@@ -286,19 +286,19 @@ contexts:
   numbers:
     # Binary
     - match: '\b0[bB]{{bin_digit}}(?:_?{{bin_digit}})*\b'
-      scope: constant.numeric.binary.js
+      scope: constant.numeric.integer.binary.js
     # Octal
     - match: '\b0[oO]{{oct_digit}}(?:_?{{oct_digit}})*\b'
-      scope: constant.numeric.octal.js
+      scope: constant.numeric.integer.octal.js
     # Legacy octal
     - match: '\b0{{oct_digit}}+\b'
-      scope: constant.numeric.octal.js
+      scope: constant.numeric.integer.octal.js
     # Hexadecimal
     - match: '\b0[xX]{{hex_digit}}(?:_?{{hex_digit}})*\b'
-      scope: constant.numeric.hex.js
+      scope: constant.numeric.integer.hex.js
     # Big integer
     - match: '\b{{dec_integer}}n\b'
-      scope: constant.numeric.bigint.js
+      scope: constant.numeric.integer.bigint.js
     # Float
     - match: '\b{{dec_integer}}(?:[.]{{dec_integer}})?(?:[eE][+\-]?{{dec_integer}})?\b'
       scope: constant.numeric.js
@@ -325,12 +325,11 @@ contexts:
     - match: '\b(?:{{builtin_objects}})\b'
       scope: support.class.builtin.js
     - match: '\bglobalThis\b'
-      scope: variable.languagel.global.js
+      scope: variable.language.js
     - match: '\b(?:{{builtin_functions}})\b'
       scope: support.function.builtin.js
 
   operators:
-    # Arrow function
     - match: '=>'
       scope: keyword.operator.arrow.js
     - match: '\?\?'
@@ -348,9 +347,9 @@ contexts:
     - match: '[()]'
       scope: punctuation.section.group.js
     - match: ';'
-      scope: punctuation.terminator.statement.js
+      scope: punctuation.terminator.js
     - match: ','
-      scope: punctuation.separator.comma.js
+      scope: punctuation.separator.js
     - match: '[?]?\.'
       scope: punctuation.accessor.js
 
