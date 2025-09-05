@@ -28,6 +28,14 @@ impl BadHighlighterManager {
         let syntax_set: SyntaxSet = syntect::dumps::from_uncompressed_data(
             include_bytes!(concat!(env!("OUT_DIR"), "/syntaxes.packdump"))
         ).expect("syntaxes.packdump should be valid");
+        let mut builder = syntax_set.into_builder();
+        match builder.add_from_folder("/home/mikko/.config/bad/syntaxes", true) {
+            Ok(()) => {}
+            Err(err) => {
+                panic!("{err:?}")
+            }
+        }
+        let syntax_set = builder.build();
 
         macro_rules! theme_scopes {
             ( $( $scope:literal = $fg:literal )* ) => {
@@ -65,7 +73,8 @@ impl BadHighlighterManager {
                 "diff.changed" = "#FFAF00"
                 "diff.deleted" = "#DB0000"
                 "support.function.builtin" = "#66D9EF"
-                "string.regexp" = "#D92682"
+                "string.regexp punctuation.definition.string.begin,string.regexp punctuation.definition.string.end" = "#D92682"
+                "string.regexp" = "#FB7FA8"
                 "support.macro,entity.name.macro,keyword.declaration.macro" = "#A6E22E"
                 "meta.interpolation" = "#FFFFFF"
                 "punctuation.section" = "#D8D8D2"
