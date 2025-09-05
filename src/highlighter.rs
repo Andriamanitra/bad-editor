@@ -55,16 +55,16 @@ impl BadHighlighterManager {
                 ..ThemeSettings::default()
             },
             scopes: theme_scopes![
-                "string,punctuation.definition.string" = "#E6DB74"
-                "comment" = "#75715E"
-                "keyword,storage" = "#D6006B"
+                "string.quoted,punctuation.definition.string" = "#E6DB74"
+                "comment,punctuation.definition.comment" = "#75715E"
+                "keyword,storage,punctuation.separator,punctuation.terminator,punctuation.accessor,punctuation.definition.block" = "#D6006B"
                 "constant" = "#AE81FF"
-                "entity.name" = "#66D9EF"
-                "storage.type,entity.name.type,support.type,meta.type" = "#4A9CAB"
+                "support.function,entity.name,meta.mapping.key.yaml" = "#66D9EF"
+                "storage.type,support.class,entity.name.type,support.type,meta.type" =  "#569CD6"
+                "storage.modifier.lifetime" = "#2AACAB"
                 "diff.inserted" = "#30CF50"
                 "diff.changed" = "#FFAF00"
                 "diff.deleted" = "#DB0000"
-                "support.function.builtin" = "#66D9EF"
                 "string.regexp punctuation.definition.string.begin,string.regexp punctuation.definition.string.end" = "#D92682"
                 "string.regexp" = "#FB7FA8"
                 "support.macro,entity.name.macro,keyword.declaration.macro" = "#A6E22E"
