@@ -9,7 +9,7 @@
 * haskell: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Haskell/Haskell.sublime-syntax) (custom license below)
 * html: combined from [sublimehq/Packages HTML (Plain)](https://github.com/sublimehq/Packages/blob/master/HTML/HTML%20%28Plain%29.sublime-syntax) and [sublimehq/Packages HTML](https://github.com/sublimehq/Packages/blob/master/HTML/HTML.sublime-syntax) (custom license below)
 * json: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/JSON/JSON.sublime-syntax) (custom license below)
-* js: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/JavaScript/JavaScript.sublime-syntax) (custom license below)
+* js: custom (MIT)
 * lisp: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Lisp/Lisp.sublime-syntax) (custom license below)
 * lua: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Lua/Lua.sublime-syntax) (custom license below)
 * markdown: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Markdown/Markdown.sublime-syntax) (custom license below)
