@@ -47,29 +47,32 @@ pub enum AutoIndent {
 
 #[derive(Debug)]
 pub struct PaneSettings {
-    pub tab_width: usize,
     pub indent_kind: IndentKind,
-    pub indent_width: usize,
+    pub indent_size: usize,
+    pub tab_width: usize,
     pub end_of_line: &'static str,
     pub autoindent: AutoIndent,
+    pub trim_trailing_whitespace: bool,
+    pub normalize_end_of_line: bool,
+    pub insert_final_newline: bool,
     pub debug_scopes: bool,
 }
 
 impl PaneSettings {
     fn indent_as_string(&self) -> String {
         match self.indent_kind {
-            IndentKind::Spaces => " ".repeat(self.indent_width),
+            IndentKind::Spaces => " ".repeat(self.indent_size),
             IndentKind::Tabs => {
                 let mut width = 0;
                 let mut indent = String::new();
                 if self.tab_width > 0 {
-                    while width + self.tab_width <= self.indent_width {
+                    while width + self.tab_width <= self.indent_size {
                         indent.push('\t');
                         width += self.tab_width;
                     }
                 }
-                if width < self.indent_width {
-                    indent.push_str(&" ".repeat(self.indent_width - width));
+                if width < self.indent_size {
+                    indent.push_str(&" ".repeat(self.indent_size - width));
                 }
                 indent
             }
@@ -90,7 +93,7 @@ impl PaneSettings {
                 };
             }
             if let Ok(indent_width) = props.get::<IndentSize>() {
-                settings.indent_width = match indent_width {
+                settings.indent_size = match indent_width {
                     IndentSize::UseTabWidth => settings.tab_width,
                     IndentSize::Value(n) => n,
                 };
@@ -101,7 +104,16 @@ impl PaneSettings {
                     EndOfLine::Lf => "\n",
                     EndOfLine::CrLf => "\r\n",
                     EndOfLine::Cr => "\r",
-                }
+                };
+                settings.normalize_end_of_line = true;
+            }
+
+            if let Ok(FinalNewline::Value(val)) = props.get::<FinalNewline>() {
+                settings.insert_final_newline = val;
+            }
+
+            if let Ok(TrimTrailingWs::Value(val)) = props.get::<TrimTrailingWs>() {
+                settings.trim_trailing_whitespace = val;
             }
         }
         settings
@@ -113,9 +125,12 @@ impl std::default::Default for PaneSettings {
         PaneSettings {
             tab_width: 4,
             indent_kind: IndentKind::Spaces,
-            indent_width: 4,
+            indent_size: 4,
             end_of_line: "\n",
             autoindent: AutoIndent::Keep,
+            trim_trailing_whitespace: true,
+            normalize_end_of_line: false,
+            insert_final_newline: true,
             debug_scopes: false,
         }
     }
@@ -231,6 +246,52 @@ impl Pane {
         Ok(())
     }
 
+    fn write_to_file(&self, mut file: std::fs::File, rope: &RopeBuffer) -> std::io::Result<()> {
+        // TODO: atomic file write
+
+        // https://docs.rs/ropey/1.6.1/ropey/index.html#a-note-about-line-breaks
+        const UNICODE_LINE_END_CHARS: [char; 7] = [
+            '\u{000A}', '\u{000D}', '\u{000B}', '\u{000C}', '\u{0085}', '\u{2028}', '\u{2029}'
+        ];
+
+        for line in rope.lines() {
+            // TODO: iterate over line.chunks() instead to avoid building temporary strings
+            let full_line = line.to_string();
+
+            if let Some(line) = full_line.strip_suffix("\r\n") {
+                if self.settings.trim_trailing_whitespace {
+                    file.write_all(line.trim_end().as_bytes())?;
+                } else {
+                    file.write_all(line.as_bytes())?;
+                }
+                if self.settings.normalize_end_of_line {
+                    file.write_all(self.settings.end_of_line.as_bytes())?;
+                } else {
+                    file.write_all(b"\r\n")?;
+                }
+            } else if let Some(line) = full_line.strip_suffix(UNICODE_LINE_END_CHARS) {
+                if self.settings.trim_trailing_whitespace {
+                    file.write_all(line.trim_end().as_bytes())?;
+                } else {
+                    file.write_all(line.as_bytes())?;
+                }
+                if self.settings.normalize_end_of_line {
+                    file.write_all(self.settings.end_of_line.as_bytes())?;
+                } else {
+                    let line_end = full_line.chars().last().unwrap();
+                    file.write_all(line_end.to_string().as_bytes())?;
+                }
+            } else if !full_line.is_empty() {
+                file.write_all(full_line.as_bytes())?;
+                if self.settings.insert_final_newline {
+                    file.write_all(self.settings.end_of_line.as_bytes())?;
+                }
+            }
+        }
+        file.flush()?;
+        Ok(())
+    }
+
     pub(crate) fn save(&mut self) {
         if let Some(path) = self.path.as_ref() {
             let file = match std::fs::OpenOptions::new().read(false).write(true).create(true).truncate(true).open(path) {
@@ -240,15 +301,17 @@ impl Pane {
                     return
                 }
             };
-            match self.content.write_to(file) {
-                Ok(n) => {
+            // FIXME: saving can modify the contents (eg. modifying line endings)
+            // and the editor should react to that
+            match self.write_to_file(file, &self.content) {
+                Ok(()) => {
                     self.modified = false;
                     let quoted_path = crate::quote_path(path.to_string_lossy().as_ref());
-                    self.inform(format!("Saved {quoted_path} ({n} bytes)"));
+                    self.inform(format!("Saved {quoted_path}"));
                 }
                 Err(err) => {
-                    self.inform(format!("Unable to save: {err}"));
-                } 
+                    self.inform(format!("Failed to save: {err}"));
+                }
             }
         } else {
             self.inform("Unable to save: no file specified".into());
@@ -447,7 +510,7 @@ impl Pane {
                 self.apply_editbatch(edits);
             }
             PaneAction::Dedent => {
-                let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_width, self.settings.tab_width);
+                let edits = EditBatch::dedent_with_cursors(&self.cursors, &self.content, self.settings.indent_size, self.settings.tab_width);
                 self.apply_editbatch(edits);
             }
             PaneAction::MoveLinesUp => {

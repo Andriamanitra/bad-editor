@@ -99,12 +99,6 @@ impl App {
         let new_value = new_value.trim();
         // TODO: we should make it impossible to have these not match prompt_completer
         match setting {
-            "ft" | "ftype" => {
-                let manager = self.highlighting.clone();
-                if let Err(()) = self.current_pane_mut().set_filetype(new_value, manager) {
-                    self.inform(format!("set error: {setting} must be one of {}", &self.highlighting.filetypes().join(", ")));
-                }
-            },
             "autoindent" => {
                 self.current_pane_mut().settings.autoindent = match new_value {
                     "off" => crate::pane::AutoIndent::None,
@@ -115,6 +109,13 @@ impl App {
                     }
                 }
             },
+            "debug" => {
+                match new_value {
+                    "scopes" => self.current_pane_mut().settings.debug_scopes = true,
+                    "off" => self.current_pane_mut().settings.debug_scopes = false,
+                    _ => self.inform("set error: debug must be one of: scopes, off".into()),
+                }
+            }
             "eol" => {
                 self.current_pane_mut().settings.end_of_line = match new_value {
                     "lf" => "\n",
@@ -126,11 +127,61 @@ impl App {
                     }
                 }
             },
-            "debug" => {
-                match new_value {
-                    "scopes" => self.current_pane_mut().settings.debug_scopes = true,
-                    "off" => self.current_pane_mut().settings.debug_scopes = false,
-                    _ => self.inform("set error: debug must be one of: scopes, off".into()),
+            "ft" | "ftype" => {
+                let manager = self.highlighting.clone();
+                if let Err(()) = self.current_pane_mut().set_filetype(new_value, manager) {
+                    self.inform(format!("set error: {setting} must be one of {}", &self.highlighting.filetypes().join(", ")));
+                }
+            },
+            "indent_size" => {
+                match new_value.parse() {
+                    Ok(n) if n <= 32 => {
+                        self.current_pane_mut().settings.indent_size = n;
+                        self.current_pane_mut().settings.tab_width = n;
+                    }
+                    _ => {
+                        self.inform("set error: indent_size must be a number between 0 and 32".into());
+                    }
+                }
+            }
+            "indent_style" => {
+                self.current_pane_mut().settings.indent_kind = match new_value {
+                    "spaces" => crate::IndentKind::Spaces,
+                    "tabs" => crate::IndentKind::Tabs,
+                    _ => {
+                        self.inform("set error: indent_style must be one of: spaces, tabs".into());
+                        return
+                    }
+                }
+            }
+            "insert_final_newline" => {
+                self.current_pane_mut().settings.insert_final_newline = match new_value {
+                    "on" => true,
+                    "off" => false,
+                    _ => {
+                        self.inform("set error: insert_final_newline must be one of: on, off".into());
+                        return
+                    }
+                }
+            }
+            "normalize_end_of_line" => {
+                self.current_pane_mut().settings.normalize_end_of_line = match new_value {
+                    "on" => true,
+                    "off" => false,
+                    _ => {
+                        self.inform("set error: normalize_end_of_line must be one of: on, off".into());
+                        return
+                    }
+                }
+            }
+            "trim_trailing_whitespace" => {
+                self.current_pane_mut().settings.trim_trailing_whitespace = match new_value {
+                    "on" => true,
+                    "off" => false,
+                    _ => {
+                        self.inform("set error: trim_trailing_whitespace must be one of: on, off".into());
+                        return
+                    }
                 }
             }
             _ => {

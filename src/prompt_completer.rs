@@ -52,9 +52,14 @@ impl CmdCompleter {
                     .args(
                         argchoice![
                             argseq!["autoindent", argchoice!["off", "keep"]],
+                            argseq!["debug", argchoice!["off", "scopes"]],
                             argseq!["eol", argchoice!["lf", "crlf", "cr"]],
                             argseq!["ftype", Arg::OneOf(filetypes)],
-                            argseq!["debug", argchoice!["off", "scopes"]],
+                            argseq!["indent_size", argchoice!["2", "4", "8"]],
+                            argseq!["indent_style", argchoice!["spaces", "tabs"]],
+                            argseq!["insert_final_newline", argchoice!["on", "off"]],
+                            argseq!["normalize_end_of_line", argchoice!["on", "off"]],
+                            argseq!["trim_trailing_whitespace", argchoice!["on", "off"]],
                         ]
                     )
                     .help("set KEY VALUE")
