@@ -30,6 +30,7 @@ impl Drop for TerminalGuard {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::new();
+    app.load_runtime_syntaxes();
 
     let args = cli::parse_cli_args();
     if let Some(file_loc) = args.get_one::<cli::FilePathWithOptionalLocation>("file") {

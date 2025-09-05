@@ -21,6 +21,7 @@ pub struct App {
     pub(crate) highlighting: Arc<BadHighlighterManager>,
     pub(crate) prompt_completer: CmdCompleter,
     pub(crate) clipboard: Clipboard,
+    pub(crate) dirs: Option<directories::ProjectDirs>,
     info: Option<String>,
 }
 
@@ -31,12 +32,13 @@ impl App {
         Self {
             panes: vec![Pane::empty()],
             current_pane_index: 0,
-            info: None,
             state: AppState::Idle,
             action_queue: VecDeque::new(),
             highlighting: Arc::new(highlighting),
             prompt_completer,
             clipboard: Clipboard::new(),
+            dirs: directories::ProjectDirs::from("", "Bad", "bad"),
+            info: None,
         }
     }
 
@@ -85,6 +87,14 @@ impl App {
             .expect("there should always be a pane at current_pane_index")
     }
 
+    pub fn syntax_dir(&self) -> Option<std::path::PathBuf> {
+        self.dirs.as_ref().map(|dirs| dirs.config_dir().join("syntaxes"))
+    }
+
+    pub fn prompt_history_file(&self) -> Option<std::path::PathBuf> {
+        self.dirs.as_ref().map(|dirs| dirs.state_dir().unwrap_or_else(|| dirs.cache_dir()).join("history"))
+    }
+
     pub fn set(&mut self, setting: &str, new_value: &str) {
         let new_value = new_value.trim();
         // TODO: we should make it impossible to have these not match prompt_completer
@@ -126,6 +136,21 @@ impl App {
             _ => {
                 self.info.replace(format!("set error: '{setting}' is not a valid setting"));
             },
+        }
+    }
+
+    pub fn load_runtime_syntaxes(&mut self) -> Option<()> {
+        let syntax_dir = self.syntax_dir()?;
+        if !syntax_dir.exists() {
+            std::fs::DirBuilder::new().recursive(true).create(&syntax_dir).ok()?;
+        }
+        let (hl, result) = BadHighlighterManager::new_with_syntaxes_from_dir(&syntax_dir);
+        if let Err(err) = result {
+            self.inform(format!("{err}"));
+            None
+        } else {
+            self.highlighting = Arc::new(hl);
+            Some(())
         }
     }
 

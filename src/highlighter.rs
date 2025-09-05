@@ -28,14 +28,6 @@ impl BadHighlighterManager {
         let syntax_set: SyntaxSet = syntect::dumps::from_uncompressed_data(
             include_bytes!(concat!(env!("OUT_DIR"), "/syntaxes.packdump"))
         ).expect("syntaxes.packdump should be valid");
-        let mut builder = syntax_set.into_builder();
-        match builder.add_from_folder("/home/mikko/.config/bad/syntaxes", true) {
-            Ok(()) => {}
-            Err(err) => {
-                panic!("{err:?}")
-            }
-        }
-        let syntax_set = builder.build();
 
         macro_rules! theme_scopes {
             ( $( $scope:literal = $fg:literal )* ) => {
@@ -81,6 +73,14 @@ impl BadHighlighterManager {
             ],
         };
         Self { theme, syntax_set }
+    }
+
+    pub fn new_with_syntaxes_from_dir<P: AsRef<std::path::Path>>(syntax_dir: P) -> (Self, Result<(), syntect::LoadingError>) {
+        let mut new = Self::new();
+        let mut builder = new.syntax_set.into_builder();
+        let result = builder.add_from_folder(syntax_dir, true);
+        new.syntax_set = builder.build();
+        (new, result)
     }
 
     pub fn filetypes(&self) -> Vec<&str> {

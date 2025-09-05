@@ -3,6 +3,7 @@ use reedline::{
     DefaultPrompt,
     DefaultPromptSegment,
     EditCommand,
+    FileBackedHistory,
     KeyCode,
     KeyModifiers,
     MenuBuilder,
@@ -216,7 +217,10 @@ impl App {
 
     pub fn command_prompt_with(&mut self, stub: Option<String>, completer: CmdCompleter) {
         self.state = AppState::InPrompt;
-        if let Some(s) = get_command(stub, completer) {
+        let history = self.prompt_history_file()
+            .and_then(|hist_file| FileBackedHistory::with_file(100, hist_file).ok())
+            .unwrap_or_else(|| FileBackedHistory::new(100).expect("creating in-memory history should never fail"));
+        if let Some(s) = get_command(stub, completer, history) {
             self.handle_command(&s);
         }
         self.state = AppState::Idle;
@@ -268,7 +272,7 @@ impl reedline::Hinter for BadHinter {
     }
 }
 
-pub fn get_command(stub: Option<String>, completer: CmdCompleter) -> Option<String> {
+fn get_command(stub: Option<String>, completer: CmdCompleter, history: FileBackedHistory) -> Option<String> {
     macro_rules! edits {
         ( $( $x:expr ),* $(,)? ) => {
             ReedlineEvent::Edit(vec![ $( $x ),* ])
@@ -303,14 +307,6 @@ pub fn get_command(stub: Option<String>, completer: CmdCompleter) -> Option<Stri
         reedline::ReedlineMenu::EngineCompleter(
             Box::new(reedline::ColumnarMenu::default().with_name("completion_menu"))
         );
-
-    // TODO: follow XDG spec
-    let history = {
-        let home = std::env::var("HOME").expect("$HOME should always be defined");
-        let hist_path = format!("{home}/.local/state/bad/history");
-        reedline::FileBackedHistory::with_file(100, hist_path.into())
-            .expect("configuring history should be fine")
-    };
 
     let hinter = BadHinter::with_style(Style::new().fg(Color::Rgb(75, 75, 75)));
 
