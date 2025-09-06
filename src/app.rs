@@ -233,13 +233,20 @@ impl App {
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),
             Action::Copy => {
-                self.clipboard.copy(self.current_pane().selections());
+                if let Err(err) = self.clipboard.copy(self.current_pane().selections()) {
+                    self.inform(err.to_string());
+                }
             }
             Action::Cut => {
                 let cuts = self.current_pane_mut().cut();
-                self.clipboard.copy(cuts);
+                if let Err(err) = self.clipboard.copy(cuts) {
+                    self.inform(err.to_string())
+                }
             }
             Action::Paste => {
+                if let Err(err) = self.clipboard.update_from_external() {
+                    self.inform(err.to_string());
+                }
                 let clips = self.clipboard.content().to_vec();
                 self.current_pane_mut().insert_from_clipboard(&clips);
             }
