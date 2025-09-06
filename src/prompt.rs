@@ -165,7 +165,7 @@ impl App {
                                         pane.cursors.primary_mut().move_to(&pane.content, first_error_loc);
                                         pane.adjust_viewport();
                                     }
-                                    pane.inform(format!("linted ({} lint(s) in current file)", lints.len()));
+                                    pane.inform(format!("linted - {} lint(s) in current file", lints.len()));
                                     pane.lints = lints;
                                 }
                             }
@@ -173,7 +173,7 @@ impl App {
                         self.inform("linted".into());
                     }
                     Err(err) => {
-                        self.inform(format!("linter error: {err:?}"));
+                        self.inform(err.to_string());
                     }
                 }
             }
