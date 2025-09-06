@@ -117,6 +117,7 @@ impl App {
                         "c#" => "dotnet run %f",
                         "haskell" => "runhaskell %f",
                         "html" => "xdg-open %f",
+                        "janet" => "janet %f",
                         "js" => "node %f",
                         "lua" => "lua %f",
                         "python" => "uv run %f",
