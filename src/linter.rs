@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::num::NonZero;
 use std::path::PathBuf;
 use std::process::Command;
@@ -15,32 +16,44 @@ enum Severity {
     Error,
 }
 
-// TODO: implement Display for LinterError so it can be printed nicely
 #[derive(Debug)]
 pub enum LinterError {
-    NoLinterForFileType,
     FailedToRun(std::io::Error),
-    FilenameRequired,
+    Other(String)
 }
+
+impl std::fmt::Display for LinterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            LinterError::FailedToRun(error) => write!(f, "linter error: failed to run: {error}"),
+            LinterError::Other(error_msg) => write!(f, "linter error: {error_msg}"),
+        }
+    }
+}
+impl Error for LinterError {}
 
 pub struct Lint {
     pub message: String,
+    filename: String,
     line: LineNo,
     column: Option<ColNo>,
     level: Severity,
 }
 
 impl Lint {
-    pub fn info(line: LineNo, column: Option<ColNo>, message: String) -> Self {
-        Self { line, column, message, level: Severity::Info }
-    }
-
-    pub fn warning(line: LineNo, column: Option<ColNo>, message: String) -> Self {
-        Self { line, column, message, level: Severity::Warning }
-    }
-
-    pub fn error(line: LineNo, column: Option<ColNo>, message: String) -> Self {
-        Self { line, column, message, level: Severity::Error }
+    fn try_from_output_line(s: &str) -> Option<Self> {
+        let mut parts = s.splitn(5, ":");
+        let filename = parts.next()?.to_string();
+        let line: LineNo = parts.next()?.parse().ok()?;
+        let column: Option<ColNo> = parts.next()?.parse().ok();
+        let level = match parts.next()? {
+            "info" => Severity::Info,
+            "warning" => Severity::Warning,
+            "error" => Severity::Error,
+            _ => Severity::Warning,
+        };
+        let message = parts.next()?.to_string();
+        Some(Self { message, filename, line, column, level })
     }
 
     pub fn color(&self) -> crossterm::style::Color {
@@ -66,98 +79,30 @@ impl Lint {
     }
 }
 
+const LINTER_SCRIPT: &str = include_str!("../defaults/linter.janet");
+
 pub fn run_linter_command(filename: Option<&str>, filetype: &str) -> Result<HashMap<Filename, Vec<Lint>>, LinterError> {
-    // TODO: this should be configurable, not hard coded
-    match filetype {
-        "rust" => {
-            fn parse_clippy_lint(line: &str) -> Option<(Filename, Lint)> {
-                match line.splitn(4, ':').collect::<Vec<_>>()[..] {
-                    [fname, line, col, msg] => {
-                        let line: LineNo = line.parse().ok()?;
-                        let col: ColNo = col.parse().ok()?;
-                        let lint = if msg.starts_with(" warning") {
-                            Lint::warning(line, Some(col), msg.to_string())
-                        } else if msg.starts_with(" error") {
-                            Lint::error(line, Some(col), msg.to_string())
-                        } else {
-                            Lint::info(line, Some(col), msg.to_string())
-                        };
-                        Some((PathBuf::from(fname), lint))
-                    }
-                    _ => None,
-                }
-            }
-
-            match Command::new("cargo").args(["clippy", "--message-format=short"]).output() {
-                Ok(output) => {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let mut results: HashMap<Filename, Vec<Lint>> = HashMap::new();
-                    for (fname, lint) in stderr.lines().filter_map(parse_clippy_lint) {
-                        results.entry(fname).or_default().push(lint);
-                    }
-                    Ok(results)
-                }
-                Err(err) => Err(LinterError::FailedToRun(err)),
-            }
-        }
-        "python" => {
-            let Some(filename) = filename else {
-                return Err(LinterError::FilenameRequired)
-            };
-
-            fn parse_ruff_lint(line: &str) -> Option<(Filename, Lint)> {
-                match line.splitn(4, ':').collect::<Vec<_>>()[..] {
-                    [fname, line, col, msg] => {
-                        let line: LineNo = line.parse().ok()?;
-                        let col: ColNo = col.parse().ok()?;
-                        let lint = Lint::warning(line, Some(col), msg.to_string());
-                        Some((PathBuf::from(fname), lint))
-                    }
-                    _ => None,
-                }
-            }
-
-            fn parse_mypy_lint(line: &str) -> Option<(Filename, Lint)> {
-                match line.splitn(3, ':').collect::<Vec<_>>()[..] {
-                    [fname, line, msg] => {
-                        let line: LineNo = line.parse().ok()?;
-                        let lint = if msg.starts_with(" error") {
-                            Lint::error(line, None, msg.to_string())
-                        } else {
-                            Lint::info(line, None, msg.to_string())
-                        };
-                        Some((PathBuf::from(fname), lint))
-                    }
-                    _ => None,
-                }
-            }
-
+    let filename = filename.unwrap_or_default();
+    match Command::new("janet")
+        .arg("-e")
+        .arg(LINTER_SCRIPT)
+        .arg("-e")
+        .arg(format!("(lint :{filetype} {filename:?})"))
+        .output()
+    {
+        Ok(output) => {
             let mut results: HashMap<Filename, Vec<Lint>> = HashMap::new();
-            let ruff = match Command::new("uvx").args(["ruff", "check", "--output-format=concise", filename]).output() {
-                Ok(output) => {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    for (fname, lint) in stdout.lines().filter_map(parse_ruff_lint) {
-                        results.entry(fname).or_default().push(lint);
-                    }
-                    Ok(())
-                }
-                Err(err) => Err(LinterError::FailedToRun(err)),
-            };
-            let mypy = match Command::new("uvx").args(["mypy", "--strict", filename]).output() {
-                Ok(output) => {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    for (fname, lint) in stdout.lines().filter_map(parse_mypy_lint) {
-                        results.entry(fname).or_default().push(lint);
-                    }
-                    Ok(())
-                }
-                Err(err) => Err(LinterError::FailedToRun(err)),
-            };
-            if let (Err(err), Err(_)) = (ruff, mypy) {
-                return Err(err);
+            let stderr = String::from_utf8_lossy(&output.stderr).trim_end().to_string();
+            if !stderr.is_empty() {
+                return Err(LinterError::Other(stderr))
+            }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for lint in stdout.lines().filter_map(|line| Lint::try_from_output_line(line.trim_end())) {
+                let filename = PathBuf::from(&lint.filename);
+                results.entry(filename).or_default().push(lint);
             }
             Ok(results)
         }
-        _ => Err(LinterError::NoLinterForFileType),
+        Err(err) => Err(LinterError::FailedToRun(err))
     }
 }
