@@ -27,3 +27,22 @@ rstest = "0.26.1"
 
 [build-dependencies]
 syntect = "5.2.0"
+
+[profile.dev.build-override]
+# Enabling optimizations for build.rs seems to improve compile times
+# significantly (24s -> 15s for clean debug build on my machine).
+# I think it's because syntect without optimizations is really slow
+# to build the syntax set.
+opt-level = 3
+
+[profile.dev]
+# App::load_runtime_syntaxes would take like 15 seconds with opt-level=0!
+# opt-level=1 doesn't seem to affect compile times much but it fixes the
+# extremely slow loading of runtime syntaxes.
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
+strip = "debuginfo"
