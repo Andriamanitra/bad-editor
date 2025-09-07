@@ -33,22 +33,36 @@
       :command ["cargo" "clippy" "--message-format=short"]
       :lint-format [:filename ":" :line ":" :column ":" :message [:severity :from-message]]
     }
-    ruff {
-      :command ["uvx" "ruff" "check" "--output-format=concise" FILENAME]
-      :lint-format [:filename ":" :line ":" :column ":" :message [:severity :warning]]
-    }
-    mypy {
-      :command ["uvx" "mypy" "--strict" FILENAME]
-      :lint-format [:filename ":" :line ":" :message [:severity :from-message]]
+    clang {
+      :command ["clang" "-fsyntax-only" "-fno-color-diagnostics" "-Wall" "-Wextra" FILENAME]
+      :lint-format [:filename ":" :line ":" :column ":" :message [:severity :from-message]]
     }
     gcc {
       :command ["gcc" "-fsyntax-only" "-fdiagnostics-plain-output" "-Wall" "-Wextra" FILENAME]
       :lint-format [:filename ":" :line ":" :column ":" :message [:severity :from-message]]
     }
+    luacheck {
+      :command ["luacheck" "--no-color" FILENAME]
+      :lint-format [:s+ :filename ":" :line ":" :column ":" :message]
+    }
+    mypy {
+      :command ["uvx" "mypy" "--strict" FILENAME]
+      :lint-format [:filename ":" :line ":" :message [:severity :from-message]]
+    }
+    quick-lint-js {
+      :command ["quick-lint-js" FILENAME]
+      :lint-format [:filename ":" :line ":" :column ":" :message [:severity :from-message]]
+    }
+    ruff {
+      :command ["uvx" "ruff" "check" "--output-format=concise" FILENAME]
+      :lint-format [:filename ":" :line ":" :column ":" :message [:severity :warning]]
+    }
    ]
     (case LANGUAGE
-     :rust (lint-with cargo-clippy)
+     :c (lint-with clang)
+     :js (lint-with quick-lint-js)
+     :lua (lint-with luacheck)
      :python (lint-with ruff mypy)
-     :c (lint-with gcc)
+     :rust (lint-with cargo-clippy)
      (string "you need to set up a linter for "LANGUAGE" in linter.janet")
     )))
