@@ -183,7 +183,7 @@ pub struct Linter {
     script: Result<Option<Vec<u8>>, LinterError>
 }
 impl Linter {
-    const DEFAULT_LINTER_SCRIPT: &str = include_str!("../defaults/linter.janet");
+    const DEFAULT_LINTER_SCRIPT: &str = include_str!("../default_config/linters.janet");
 
     fn init_with_script(script: Vec<u8>) -> Self {
         Self { script: Ok(Some(script)) }
