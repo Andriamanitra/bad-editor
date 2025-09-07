@@ -95,6 +95,10 @@ impl App {
         self.dirs.as_ref().map(|dirs| dirs.state_dir().unwrap_or_else(|| dirs.cache_dir()).join("history"))
     }
 
+    pub fn linter_script_file(&self) -> Option<std::path::PathBuf> {
+        self.dirs.as_ref().map(|dirs| dirs.config_dir().join("linters.janet"))
+    }
+
     pub fn set(&mut self, setting: &str, new_value: &str) {
         let new_value = new_value.trim();
         // TODO: we should make it impossible to have these not match prompt_completer

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs::OpenOptions;
+use std::io::Read;
 use std::num::NonZero;
 use std::path::PathBuf;
 
@@ -20,6 +22,7 @@ enum Severity {
 
 #[derive(Debug)]
 pub enum LinterError {
+    IOError,
     JanetInitError,
     JanetCompileError,
     JanetParseError,
@@ -43,12 +46,13 @@ impl From<janetrs::client::Error> for LinterError {
 impl std::fmt::Display for LinterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
+            LinterError::IOError => write!(f, "linter error: failed to read linters.janet"),
             LinterError::JanetInitError => write!(f, "linter error: janet interpreter failed to initialize"),
-            LinterError::JanetCompileError => write!(f, "linter error: linter.janet failed to compile"),
-            LinterError::JanetParseError => write!(f, "linter error: bad linter.janet"),
-            LinterError::JanetRuntimeError => write!(f, "linter error: runtime error in linter.janet"),
+            LinterError::JanetCompileError => write!(f, "linter error: linters.janet failed to compile"),
+            LinterError::JanetParseError => write!(f, "linter error: bad linters.janet"),
+            LinterError::JanetRuntimeError => write!(f, "linter error: runtime error in linters.janet"),
             LinterError::Other(error_msg) => write!(f, "linter error: {error_msg}"),
-            LinterError::JanetMissingRequiredLintField { field } => write!(f, "linter error: linter.janet returned a lint without {field}"),
+            LinterError::JanetMissingRequiredLintField { field } => write!(f, "linter error: linters.janet returned a lint without {field}"),
             LinterError::JanetFieldWithWrongType { field, expected_type, actual_type } => {
                 write!(f, "linter error: expected {field} to be {expected_type} but received {actual_type}")
             }
@@ -175,15 +179,52 @@ impl TryFrom<Janet> for Lint {
     }
 }
 
-const LINTER_SCRIPT: &str = include_str!("../defaults/linter.janet");
+pub struct Linter {
+    script: Result<Option<Vec<u8>>, LinterError>
+}
+impl Linter {
+    const DEFAULT_LINTER_SCRIPT: &str = include_str!("../defaults/linter.janet");
 
-pub fn run_linter_command(filename: Option<&str>, filetype: &str) -> Result<HashMap<Filename, Vec<Lint>>, LinterError> {
+    fn init_with_script(script: Vec<u8>) -> Self {
+        Self { script: Ok(Some(script)) }
+    }
+
+    pub fn init(script_path: impl AsRef<std::path::Path>) -> Self {
+        if let Ok(mut file) = OpenOptions::new().read(true).create(false).open(script_path) {
+            let mut buf = Vec::new();
+            if file.read_to_end(&mut buf).is_err() {
+                return Self { script: Err(LinterError::IOError) }
+            }
+            Self::init_with_script(buf)
+        } else {
+            Self::init_default()
+        }
+    }
+
+    pub fn init_default() -> Self {
+        Self { script: Ok(None) }
+    }
+
+    pub fn run_linter_command(self, filename: Option<&str>, filetype: &str) -> Result<HashMap<Filename, Vec<Lint>>, LinterError> {
+        match self.script {
+            Ok(Some(script)) => run_linter_command(script, filename, filetype),
+            Ok(None) => run_linter_command(Self::DEFAULT_LINTER_SCRIPT, filename, filetype),
+            Err(err) => Err(err)
+        }
+    }
+}
+
+fn run_linter_command(script: impl AsRef<[u8]>, filename: Option<&str>, filetype: &str) -> Result<HashMap<Filename, Vec<Lint>>, LinterError> {
     let filename = filename.unwrap_or_default();
-    let Ok(janet) = JanetClient::init_with_default_env() else {
-        return Err(LinterError::JanetInitError)
-    };
-    janet.run(LINTER_SCRIPT).map_err(LinterError::from)?;
-    let val = janet.run(format!("(lint :{filetype} {filename:?})")).map_err(LinterError::from)?;
+    let janet = JanetClient::init_with_default_env()
+        .map_err(|_| LinterError::JanetInitError)
+        .and_then(|client| {
+            client.run_bytes(script).map_err(LinterError::from)?;
+            Ok(client)
+        })?;
+    let val = janet
+        .run(format!("(lint :{filetype} {filename:?})"))
+        .map_err(LinterError::from)?;
     match TaggedJanet::from(val) {
         TaggedJanet::Array(lints) => {
             let lints = lints.into_iter().map(Lint::try_from).collect::<Result<Vec<Lint>, LinterError>>()?;

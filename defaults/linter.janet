@@ -64,5 +64,5 @@
      :lua (lint-with luacheck)
      :python (lint-with ruff mypy)
      :rust (lint-with cargo-clippy)
-     (string "you need to set up a linter for "LANGUAGE" in linter.janet")
+     (string "you need to set up a linter for "LANGUAGE" in linters.janet")
     )))

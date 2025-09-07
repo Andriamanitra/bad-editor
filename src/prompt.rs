@@ -153,7 +153,11 @@ impl App {
                 // TODO: run the linter asynchronously in the background
                 let fname = self.current_pane().path.as_ref().and_then(|p| p.to_str());
                 let ft = self.current_pane().filetype();
-                match crate::linter::run_linter_command(fname, ft) {
+                let linter = match self.linter_script_file() {
+                    Some(custom_script) => crate::linter::Linter::init(custom_script),
+                    None => crate::linter::Linter::init_default(),
+                };
+                match linter.run_linter_command(fname, ft) {
                     Ok(mut lints_by_filename) => {
                         for pane in self.panes.iter_mut() {
                             if let Some(path) = &pane.path {
