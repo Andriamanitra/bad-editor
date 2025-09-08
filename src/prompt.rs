@@ -117,6 +117,7 @@ impl App {
                         "c#" => "dotnet run %f",
                         "haskell" => "runhaskell %f",
                         "html" => "xdg-open %f",
+                        "janet" => "janet %f",
                         "js" => "node %f",
                         "lua" => "lua %f",
                         "python" => "uv run %f",
@@ -152,7 +153,11 @@ impl App {
                 // TODO: run the linter asynchronously in the background
                 let fname = self.current_pane().path.as_ref().and_then(|p| p.to_str());
                 let ft = self.current_pane().filetype();
-                match crate::linter::run_linter_command(fname, ft) {
+                let linter = match self.linter_script_file() {
+                    Some(custom_script) => crate::linter::Linter::init(custom_script),
+                    None => crate::linter::Linter::init_default(),
+                };
+                match linter.run_linter_command(fname, ft) {
                     Ok(mut lints_by_filename) => {
                         for pane in self.panes.iter_mut() {
                             if let Some(path) = &pane.path {
@@ -165,7 +170,7 @@ impl App {
                                         pane.cursors.primary_mut().move_to(&pane.content, first_error_loc);
                                         pane.adjust_viewport();
                                     }
-                                    pane.inform(format!("linted ({} lint(s) in current file)", lints.len()));
+                                    pane.inform(format!("linted - {} lint(s) in current file", lints.len()));
                                     pane.lints = lints;
                                 }
                             }
@@ -173,7 +178,7 @@ impl App {
                         self.inform("linted".into());
                     }
                     Err(err) => {
-                        self.inform(format!("linter error: {err:?}"));
+                        self.inform(err.to_string());
                     }
                 }
             }
