@@ -16,6 +16,7 @@
 * lua: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Lua/Lua.sublime-syntax) (custom license below)
 * markdown: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Markdown/Markdown.sublime-syntax) (custom license below)
 * python: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Python/Python.sublime-syntax) (custom license below)
+* regexp: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Regular%20Expressions/RegExp%20%28Basic%29.sublime-syntax) (custom license below)
 * ruby: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Ruby/Ruby.sublime-syntax) (custom license below)
 * rust: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Rust/Rust.sublime-syntax) (custom license below)
 * sql: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/SQL/SQL%20%28basic%29.sublime-syntax) (custom license below)
