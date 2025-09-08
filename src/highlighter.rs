@@ -67,7 +67,7 @@ impl BadHighlighterManager {
                 "diff.deleted" = "#DB0000"
                 "string.regexp punctuation.definition.string.begin,string.regexp punctuation.definition.string.end" = "#D92682"
                 "string.regexp" = "#FB7FA8"
-                "support.macro,entity.name.macro,keyword.declaration.macro" = "#A6E22E"
+                "support.macro,support.function.macro,variable.macro,entity.name.macro,punctuation.definition.macro" = "#A6E22E"
                 "meta.interpolation" = "#FFFFFF"
                 "punctuation.section" = "#D8D8D2"
             ],
