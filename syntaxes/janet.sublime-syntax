@@ -1,0 +1,179 @@
+%YAML 1.2
+---
+name: janet
+scope: source.janet
+
+file_extensions:
+  - janet
+
+variables:
+  non_ident: '[ \t\r\n()`''"\[\]\{\}|,;~@]'
+  identifier: '[^\s\[\](){}`''"|,;~@#:0-9][^\s\[\](){}`''"|,;~@#]*'
+  special_forms: '(?:def|var|fn|do|quote|if|splice|while|break|set|quasiquote|unquote|upscope)'
+  macros: |-
+    (?x:
+        as-macro
+      | defmacro-?
+      | defn-?
+      | def-
+      | var-
+      | toggle
+      | \+\+
+      | --
+      | \+=
+      | -=
+      | \*=
+      | /=
+      | %=
+      | assert
+      | defdyn
+      | assertf
+      | default
+      | comment
+      | if-not
+      | when
+      | unless
+      | cond
+      | case
+      | let
+      | protect
+      | and
+      | or
+      | try
+      | with-syms
+      | defer
+      | edefer
+      | prompt
+      | chr
+      | label
+      | with
+      | when-with
+      | if-with
+      | forv
+      | for
+      | eachk
+      | eachp
+      | repeat
+      | forever
+      | each
+      | loop
+      | seq
+      | catseq
+      | tabseq
+      | generate
+      | coro
+      | fiber-fn
+      | if-let
+      | when-let
+      | juxt
+      | tracev
+      | ->
+      | ->>
+      | -\?>
+      | -\?>>
+      | as->
+      | as\?->
+      | with-dyns
+      | with-env
+      | with-vars
+      | match
+      | varfn
+      | short-fn
+      | comptime
+      | compif
+      | compwhen
+      | import
+      | use
+      | doc
+      | ev/spawn
+      | ev/do-thread
+      | ev/with-lock
+      | ev/with-rlock
+      | ev/with-wlock
+      | ev/spawn-thread
+      | ev/with-deadline
+      | ev/gather
+      | delay
+      | ffi/defbind-alias
+      | ffi/defbind
+      | os/isatty
+    )
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: numbers
+    - match: '(?<=[(]\s*){{special_forms}}(?={{non_ident}})'
+      scope: keyword.janet
+    - match: '(?<=[\s\[])(?:&opt|&named|&)(?={{non_ident}})'
+      scope: punctuation.separator.janet
+    - match: '(?<=[(]\s*){{macros}}(?={{non_ident}})'
+      scope: keyword.janet
+    - match: '''{{identifier}}'
+      scope: string.unquoted.janet
+    - match: ':{{identifier}}'
+      scope: constant.other.janet
+    - match: '{{identifier}}'
+      scope: variable.janet
+
+  comments:
+    - match: '#'
+      scope: punctuation.definition.comment.janet
+      push:
+        - meta_scope: comment.line.janet
+        - match: '$'
+          pop: 1
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.janet
+      push: inside_double_quoted_string
+    - match: '```'
+      scope: punctuation.definition.string.begin.janet
+      push: inside_triple_backtick_string
+    - match: '``'
+      scope: punctuation.definition.string.begin.janet
+      push: inside_double_backtick_string
+    - match: '`'
+      scope: punctuation.definition.string.begin.janet
+      push: inside_backtick_string
+
+  inside_double_quoted_string:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.janet string.quoted.double.janet
+    - match: '\\(?:["0abfnrtv\\]|x\h{2}|u\h{4})'
+      scope: meta.string.janet
+    - match: '"'
+      scope: punctuation.definition.string.end.janet
+      pop: true
+
+  inside_backtick_string:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.janet string.quoted.other.janet
+    - match: '`'
+      scope: punctuation.definition.string.end.janet
+      pop: true
+
+  inside_double_backtick_string:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.janet string.quoted.other.janet
+    - match: '``'
+      scope: punctuation.definition.string.end.janet
+      pop: true
+
+  inside_triple_backtick_string:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.janet string.quoted.other.janet
+    - match: '```'
+      scope: punctuation.definition.string.end.janet
+      pop: true
+
+  numbers:
+    # TODO: number literals with custom radix
+    # Hexadecimal
+    - match: '(?!{{identifier}})[+\-]?0x\h[\h_]*[.]?[\h_]\b'
+      scope: constant.numeric.integer.hex.janet
+    # Float
+    - match: '(?!{{identifier}})[+\-]?[0-9][0-9_]*(?:[.][0-9_]*)?(?:[eE][+\-]?[0-9]+)?'
+      scope: constant.numeric.janet
