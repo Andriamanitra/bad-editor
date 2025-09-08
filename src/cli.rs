@@ -52,6 +52,12 @@ impl FilePathWithOptionalLocation {
     }
 }
 
+impl From<PathBuf> for FilePathWithOptionalLocation {
+    fn from(value: PathBuf) -> Self {
+        Self { path: value, line: None, column: None }
+    }
+}
+
 pub fn parse_cli_args() -> clap::ArgMatches {
     let open_file_at_loc_parser =
         StringValueParser::new().map(|p| FilePathWithOptionalLocation::parse_from_str(&p, false));

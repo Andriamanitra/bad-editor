@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use nu_ansi_term::{Color, Style};
 use reedline::{
     DefaultPrompt,
@@ -14,6 +16,7 @@ use reedline::{
 use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::exec::execute_interactive_command_from_template;
+use crate::linter::Linter;
 use crate::prompt_completer::CmdCompleter;
 use crate::{Action, App, MoveTarget, PaneAction};
 
@@ -38,7 +41,7 @@ fn parse_target(s: &str) -> Option<MoveTarget> {
         Some(MoveTarget::Location(line, col))
     } else {
         let line = s.parse().ok()?;
-        Some(MoveTarget::Location(line, std::num::NonZero::<usize>::MIN))
+        Some(MoveTarget::Location(line, NonZero::<usize>::MIN))
     }
 }
 
@@ -101,6 +104,51 @@ impl App {
                     });
                 } else {
                     self.inform(format!("to error: {arg:?} is not a valid transformation"));
+                }
+            }
+            "edit" => {
+                let arg = arg.trim();
+                let mut args = arg.trim().split_ascii_whitespace();
+                match args.next() {
+                    Some("syntax") => {
+                        if let Some(ftype) = args.next() {
+                            if let Some(syntax_dir) = self.syntax_dir() {
+                                let fname = format!("{ftype}.sublime-syntax");
+                                let fpath = syntax_dir.join(fname);
+                                let hl = self.highlighting.clone();
+                                if let Ok(()) = self.current_pane_mut().open_file(&fpath.clone().into(), hl) {
+                                    if self.current_pane().path.as_ref().is_some_and(|p| p == &fpath)
+                                    && self.current_pane().content.len_bytes() == 0 {
+                                        let template = include_str!("../default_config/template.sublime-syntax").replace("FTYPE", ftype);
+                                        self.enqueue(Action::HandledByPane(PaneAction::Insert(template)));
+                                        self.enqueue(Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Start)));
+                                    }
+                                }
+                            } else {
+                                self.inform("edit error: no config directory".into());
+                            }
+                        } else {
+                            self.inform("Usage: edit syntax FTYPE".into());
+                        }
+                    }
+                    Some("linters") => {
+                        if let Some(fpath) = self.linter_script_file() {
+                            let hl = self.highlighting.clone();
+                            if let Ok(()) = self.current_pane_mut().open_file(&fpath.clone().into(), hl) {
+                                if self.current_pane().path.as_ref().is_some_and(|p| p == &fpath)
+                                && self.current_pane().content.len_bytes() == 0 {
+                                    self.enqueue(Action::HandledByPane(PaneAction::Insert(Linter::DEFAULT_LINTER_SCRIPT.to_string())));
+                                    let loc = MoveTarget::Location(NonZero::try_from(32).unwrap(), NonZero::try_from(5).unwrap());
+                                    self.enqueue(Action::HandledByPane(PaneAction::MoveTo(loc)));
+                                }
+                            }
+                        } else {
+                            self.inform("edit error: no config directory".into());
+                        }
+                    }
+                    _ => {
+                        self.inform(format!("edit error: invalid argument {arg:?}"));
+                    }
                 }
             }
             "exec" | "x" => {

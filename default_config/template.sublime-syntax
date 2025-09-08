@@ -1,0 +1,42 @@
+%YAML 1.2
+---
+name: FTYPE
+scope: source.FTYPE
+
+file_extensions:
+  - FTYPE
+
+variables:
+  keywords: "\b(?:if|while|for)\b"
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: numbers
+    - match: '{{keywords}}'
+      scope: keyword.FTYPE
+
+  comments:
+    - match: '#'
+      scope: punctuation.definition.comment.FTYPE
+      push:
+        - meta_scope: comment.line.FTYPE
+        - match: '$'
+          pop: 1
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.FTYPE
+      push: inside_double_quoted_string
+
+  inside_double_quoted_string:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.FTYPE string.quoted.double.FTYPE
+    - match: '"'
+      scope: punctuation.definition.string.end.FTYPE
+      pop: true
+
+  numbers:
+    - match: '\b[0-9]+\b'
+      scope: constant.numeric.FTYPE

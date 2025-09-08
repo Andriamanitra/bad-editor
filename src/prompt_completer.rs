@@ -21,6 +21,15 @@ impl CmdCompleter {
 
         CmdCompleter {
             cmds: vec![
+                CmdBuilder::new("edit")
+                    .args(
+                        argchoice![
+                            "linters",
+                            argseq!["syntax", Arg::OneOf(filetypes.clone())]
+                        ]
+                    )
+                    .help("edit linters | edit syntax FILETYPE")
+                    .build(),
                 CmdBuilder::new("exec").alias("x")
                     .args(Arg::String)
                     .help("exec [TEMPLATE]")
