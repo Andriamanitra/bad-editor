@@ -201,6 +201,7 @@ impl App {
             None
         } else {
             self.highlighting = Arc::new(hl);
+            self.prompt_completer = CmdCompleter::make_completer(self.highlighting.filetypes().as_slice());
             Some(())
         }
     }
