@@ -11,6 +11,7 @@
 * janet: custom (MIT)
 * js: custom (MIT)
 * json: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/JSON/JSON.sublime-syntax) (custom license below)
+* julia: [JuliaEditorSupport/Julia-sublime](https://github.com/JuliaEditorSupport/Julia-sublime/blob/master/Julia.sublime-syntax) (MIT)
 * lisp: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Lisp/Lisp.sublime-syntax) (custom license below)
 * lua: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Lua/Lua.sublime-syntax) (custom license below)
 * markdown: [sublimehq/Packages](https://github.com/sublimehq/Packages/blob/master/Markdown/Markdown.sublime-syntax) (custom license below)

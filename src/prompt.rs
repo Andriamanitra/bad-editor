@@ -167,6 +167,7 @@ impl App {
                         "html" => "xdg-open %f",
                         "janet" => "janet %f",
                         "js" => "node %f",
+                        "julia" => "julia %f",
                         "lua" => "lua %f",
                         "python" => "uv run %f",
                         "ruby" => "ruby %f",
