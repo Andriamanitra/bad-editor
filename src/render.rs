@@ -480,6 +480,7 @@ impl App {
         writer.queue(PrintStyledContent(default_style.negative().apply(status_line_right)))?;
 
         writer.queue(MoveTo(0, wsize.rows - 1))?;
+        writer.queue(crossterm::style::SetStyle(default_style))?;
         writer.queue(Print(
             match self.status_msg() {
                 Some(info) => format!("{:.width$}", &info, width = wsize.columns as usize),
