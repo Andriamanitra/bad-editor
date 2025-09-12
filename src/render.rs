@@ -248,10 +248,42 @@ impl App {
             }
             format!("{:.decimal_places$}{}", filesize, UNITS[unit], decimal_places=if filesize < 10.0 { 2 } else { 1 })
         };
+        let pane_indicator = match (self.panes.len(), 1 + self.current_pane_index) {
+            (1, _) => "".to_string(),
+            (n_panes, curr @ 1..12) => {
+                let mut s = String::new();
+                for i in 1..=n_panes.min(12) {
+                    if i == curr {
+                        s.push('[');
+                    } else if i == 1 + curr {
+                        s.push(']');
+                    } else {
+                        s.push(' ');
+                    }
+                    s.push_str(&format!("{i}"));
+                }
+                if curr == n_panes {
+                    s.push(']');
+                } else {
+                    s.push(' ');
+                }
+                s
+            }
+            (n_panes, curr) => {
+                if curr == n_panes {
+                    format!("..{}[{}]", curr - 1, curr)
+                } else if curr + 1 == n_panes {
+                    format!("..{}[{}]{}", curr - 1, curr, curr + 1)
+                } else {
+                    format!("..{}[{}]{}..", curr - 1, curr, curr + 1)
+                }
+            }
+        };
         format!(
-            " col:{:<3} line:{:<3} {}",
-            1 + cursor.column(content),
+            "{} {:>3}:{:<3} {}",
+            pane_indicator,
             1 + content.byte_to_line(cursor.offset),
+            1 + cursor.column(content),
             fsize_indicator
         )
     }

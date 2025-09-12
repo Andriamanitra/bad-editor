@@ -54,6 +54,11 @@ pub enum Action {
     Cut,
     Copy,
     Paste,
+    NewPane,
+    ClosePane,
+    GoToPane(usize),
+    NextPane,
+    PreviousPane,
 }
 
 #[derive(Debug, Clone, Copy)]

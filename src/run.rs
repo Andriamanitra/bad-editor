@@ -87,6 +87,8 @@ pub fn get_action(ev: &event::Event) -> Action {
             // TODO: no hard coding, read keybindings from a config file
             match code {
                 KeyCode::Char('q') if ctrl => Action::Quit,
+                KeyCode::Char('w') if ctrl => Action::ClosePane,
+                KeyCode::Char('t') if ctrl => Action::NewPane,
                 KeyCode::Char('e') if ctrl => Action::CommandPrompt,
                 KeyCode::Char('o') if ctrl => Action::CommandPromptEdit("open ".into()),
                 KeyCode::Char('z') if ctrl => Action::HandledByPane(PaneAction::Undo),
@@ -101,6 +103,7 @@ pub fn get_action(ev: &event::Event) -> Action {
                 KeyCode::Char('v') if ctrl => Action::Paste,
                 KeyCode::Char('a') if ctrl => Action::HandledByPane(PaneAction::SelectAll),
                 KeyCode::Char('s') if ctrl => Action::Save,
+                KeyCode::Char(c @ '1'..='9') if alt => Action::GoToPane((c as u8 - b'1') as usize),
                 KeyCode::Char('M') if alt =>
                     Action::HandledByPane(PaneAction::SelectTo(MoveTarget::MatchingPair)),
                 KeyCode::Char('m') if alt =>
@@ -118,13 +121,15 @@ pub fn get_action(ev: &event::Event) -> Action {
                     else            { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(1))) },
                 KeyCode::Left => {
                     let target = if ctrl { MoveTarget::NextWordBoundaryLeft } else { MoveTarget::Left(1) };
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(target)) }
+                    if alt        { Action::PreviousPane }
+                    else if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }
+                    else          { Action::HandledByPane(PaneAction::MoveTo(target)) }
                 }
                 KeyCode::Right => {
                     let target = if ctrl { MoveTarget::NextWordBoundaryRight } else { MoveTarget::Right(1) };
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(target)) }
+                    if alt        { Action::NextPane }
+                    else if shift { Action::HandledByPane(PaneAction::SelectTo(target)) }
+                    else          { Action::HandledByPane(PaneAction::MoveTo(target)) }
                 }
                 KeyCode::Home if ctrl =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Start)) }

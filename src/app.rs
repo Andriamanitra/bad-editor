@@ -70,7 +70,7 @@ impl App {
             pane.clear_status_msg();
         }
     }
-    
+
     pub fn inform(&mut self, msg: String) {
         self.info.replace(msg);
     }
@@ -264,6 +264,40 @@ impl App {
             }
             Action::Open(path) => {
                 self.open_file_pane(&path);
+            }
+            Action::NewPane => {
+                self.panes.push(Pane::empty());
+                self.current_pane_index = self.panes.len() - 1;
+            }
+            Action::ClosePane => {
+                if self.panes.len() > 1 {
+                    if self.current_pane().modified && self.current_pane().path.is_some() {
+                        // FIXME: prompt for confirmation
+                        self.current_pane_mut().inform("please save your work before closing the pane".into());
+                    } else {
+                        self.panes.remove(self.current_pane_index);
+                        self.current_pane_index = self.current_pane_index.saturating_sub(1);
+                    }
+                } else {
+                    self.current_pane_mut().inform("the last pane can not be closed".into());
+                }
+            }
+            Action::GoToPane(idx) => {
+                if idx < self.panes.len() {
+                    self.current_pane_index = idx;
+                } else {
+                    self.inform(format!("there is no pane {}", idx + 1));
+                }
+            }
+            Action::NextPane => {
+                if self.current_pane_index + 1 < self.panes.len() {
+                    self.current_pane_index += 1;
+                }
+            }
+            Action::PreviousPane => {
+                if self.current_pane_index > 0 {
+                    self.current_pane_index -= 1;
+                }
             }
         }
     }

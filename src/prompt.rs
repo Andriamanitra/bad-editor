@@ -266,6 +266,13 @@ impl App {
                     self.enqueue(Action::SaveAs(crate::expand_path(arg)));
                 }
             }
+            "pane" => {
+                self.enqueue(Action::NewPane);
+                if !arg.is_empty() {
+                    let path = FilePathWithOptionalLocation::parse_from_str(arg, true);
+                    self.enqueue(Action::Open(path));
+                }
+            }
             _ => self.inform(format!("Unknown command '{command}'")),
         }
     }

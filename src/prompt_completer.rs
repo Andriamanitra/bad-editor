@@ -53,6 +53,10 @@ impl CmdCompleter {
                     .args(Arg::File)
                     .help("open FILE")
                     .build(),
+                CmdBuilder::new("pane")
+                    .args(Arg::File)
+                    .help("pane [FILE]")
+                    .build(),
                 CmdBuilder::new("save")
                     .args(Arg::File)
                     .help("save [FILE]")
@@ -101,7 +105,7 @@ impl reedline::Completer for CmdCompleter {
                 }
             ]
         }
-    
+
         if let Some((first, rest)) = input.split_once(' ') {
             for cmd in &self.cmds {
                 if cmd.has_alias(first) {
@@ -273,7 +277,7 @@ impl Cmd {
     fn primary_name(&self) -> &'static str {
         self.prefixes[0]
     }
-    
+
     fn arg_complete(&self, s: &str, s_offset: usize) -> Vec<reedline::Suggestion> {
         match self.args.complete(s, s_offset, true) {
             ArgCompleteResult::SkipTo(_) => vec![],
