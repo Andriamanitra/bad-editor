@@ -7,7 +7,7 @@ file_extensions:
   - FTYPE
 
 variables:
-  keywords: "\b(?:if|while|for)\b"
+  keywords: '\b(?:if|while|for)\b'
 
 contexts:
   main:
