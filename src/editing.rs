@@ -84,7 +84,7 @@ impl EditBatch {
         }
     }
 
-    pub fn transform_selections<F>(cursors: &MultiCursor, content: &RopeBuffer, transform: F) -> Self 
+    pub fn transform_selections<F>(cursors: &MultiCursor, content: &RopeBuffer, transform: F) -> Self
         where F: Fn(String) -> Option<String>
     {
         let mut edits = vec![];
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(batch.edits.len(), 4);
         assert_eq!(batch.edits[0], Edit::Delete(ByteOffset(5)..ByteOffset(12)));  // Truncated
         assert_eq!(batch.edits[1], Edit::insert_str(ByteOffset(12), "hello"));
-        assert_eq!(batch.edits[2], Edit::Delete(ByteOffset(20)..ByteOffset(25))); // Truncated  
+        assert_eq!(batch.edits[2], Edit::Delete(ByteOffset(20)..ByteOffset(25))); // Truncated
         assert_eq!(batch.edits[3], Edit::insert_str(ByteOffset(25), "world"));
     }
 
