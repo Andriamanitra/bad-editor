@@ -162,7 +162,19 @@ impl Cursor {
             MoveTarget::Right(n) => Some(self.right(content, n)),
             MoveTarget::Start => Some(ByteOffset(0)),
             MoveTarget::End => Some(ByteOffset(content.len_bytes())),
-            MoveTarget::StartOfLine => Some(self.line_start(content)),
+            MoveTarget::StartOfLine => {
+                let line_start = self.line_start(content);
+                let indent_len = content
+                    .bytes_at(line_start)
+                    .take_while(|&b| b == b' ' || b == b'\t')
+                    .count();
+                let after_indent_offset = ByteOffset(line_start.0 + indent_len);
+                if self.pos() == line_start || self.offset > after_indent_offset {
+                    Some(after_indent_offset)
+                } else {
+                    Some(line_start)
+                }
+            }
             MoveTarget::EndOfLine => Some(self.line_end(content)),
             MoveTarget::NextWordBoundaryLeft => Some(self.word_boundary_left(content)),
             MoveTarget::NextWordBoundaryRight => Some(self.word_boundary_right(content)),
@@ -428,7 +440,7 @@ impl Cursor {
         }
         content.slice(&(stem_start .. self.offset)).to_string()
     }
-    
+
     pub fn is_at_start_of_line(&self, content: &RopeBuffer) -> bool {
         content.slice(&(self.line_start(content) .. self.offset)).chars().all(|c| c.is_ascii_whitespace())
     }
@@ -677,5 +689,20 @@ mod tests {
         let r = RopeBuffer::from_str(s);
         let cursor = Cursor::new_with_offset(ByteOffset(start));
         assert_eq!(cursor.matching_pair(&r), expected)
+    }
+
+    #[rstest]
+    #[case(3, 2)]
+    #[case(2, 0)]
+    #[case(0, 2)]
+    #[case(1, 0)]
+    fn test_home_with_indent(
+        #[case] from_offset: usize,
+        #[case] expected: usize,
+    ) {
+        let r = RopeBuffer::from_str("\t\tabc");
+        let cursor = Cursor::new_with_offset(ByteOffset(from_offset));
+        assert_eq!(cursor.target_byte_offset(&r, MoveTarget::StartOfLine), Some(ByteOffset(expected)));
+        
     }
 }
