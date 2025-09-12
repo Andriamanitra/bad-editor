@@ -155,6 +155,7 @@ const DEFAULT_BG: Color = Color::Rgb { r: 0x1a, g: 0x1a, b: 0x1a };
 const SELECTION_FG: Color = Color::Black;
 const SELECTION_BG: Color = Color::Rgb { r: 0x88, g: 0xff, b: 0xc5 };
 const LIGHT_GREY: Color = Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa };
+const SLIGHTLY_LIGHTER_BG: Color = Color::Rgb { r: 0x1e, g: 0x1e, b: 0x1e };
 const LIGHTER_BG: Color = Color::Rgb { r: 0x24, g: 0x24, b: 0x24 };
 
 impl App {
@@ -221,6 +222,7 @@ impl App {
         let primary_cursor_span = current_pane.cursors.primary().line_span(content);
         let primary_cursor_line = current_pane.cursors.primary().current_line_number(content);
         let default_style = ContentStyle::new().with(DEFAULT_FG).on(DEFAULT_BG);
+        let completions_style = ContentStyle::new().with(LIGHT_GREY).on(SLIGHTLY_LIGHTER_BG);
         let lineno_style = ContentStyle::new().with(LIGHT_GREY).on(LIGHTER_BG);
 
         macro_rules! peek {
@@ -364,6 +366,17 @@ impl App {
             writer.queue(Clear(ClearType::UntilNewLine))?;
             writer.queue(MoveToNextLine(1))?;
             console_row += 1;
+
+            // render suggestions
+            if primary_cursor_line == lineno {
+                if let Some(suggs) = current_pane.suggestions.as_ref() {
+                    writer.queue(crossterm::style::SetStyle(completions_style))?;
+                    writer.queue(Print(suggs.render(wsize.columns as usize)))?;
+                    writer.queue(Clear(ClearType::UntilNewLine))?;
+                    writer.queue(MoveToNextLine(1))?;
+                    console_row += 1;
+                }
+            }
 
             // render debug scopes
             if current_pane.settings.debug_scopes && primary_cursor_line == lineno {

@@ -13,6 +13,7 @@ mod render;
 mod rope_ext;
 mod ropebuffer;
 mod run;
+mod completer;
 
 use std::num::NonZeroUsize;
 use std::path::PathBuf;

@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::cli::FilePathWithOptionalLocation;
+use crate::completer::{Completer, CompletionResult, SuggestionMenu};
 use crate::cursor::Cursor;
-use crate::editing::EditBatch;
+use crate::editing::{Edit, EditBatch};
 use crate::highlighter::{BadHighlighter, BadHighlighterManager};
 use crate::linter::Lint;
 use crate::ropebuffer::RopeBuffer;
@@ -34,6 +35,12 @@ pub enum PaneAction {
     QuickAddNext,
     ScrollDown(usize),
     ScrollUp(usize),
+    Tab,
+    BackTab,
+    Autocomplete,
+    AutocompleteCyclePrevious,
+    AutocompleteCycleNext,
+    AutocompleteAcceptSuggestion,
 }
 
 #[derive(Debug)]
@@ -150,6 +157,8 @@ pub struct Pane {
     pub(crate) last_search: Option<String>,
     pub(crate) lints: Vec<Lint>,
     info: Option<String>,
+    completer: Completer,
+    pub(crate) suggestions: Option<SuggestionMenu>,
 }
 
 impl Pane {
@@ -166,6 +175,8 @@ impl Pane {
 
             settings: PaneSettings::default(),
             highlighter: None,
+            completer: Completer::new(),
+            suggestions: None,
             last_search: None,
             lints: vec![],
             info: None,
@@ -179,6 +190,7 @@ impl Pane {
         } else {
             self.lints.clear();
         }
+        self.suggestions.take();
         self.clear_status_msg();
     }
 
@@ -436,6 +448,18 @@ impl Pane {
 
     pub(crate) fn handle_event(&mut self, event: PaneAction) {
         match event {
+            PaneAction::ScrollDown(_) => (),
+            PaneAction::ScrollUp(_) => (),
+            PaneAction::Tab => (),
+            PaneAction::BackTab => (),
+            PaneAction::AutocompleteCyclePrevious => (),
+            PaneAction::AutocompleteCycleNext => (),
+            _ => {
+                self.suggestions.take();
+            }
+        }
+
+        match event {
             PaneAction::MoveTo(target) => {
                 self.cursors.move_to(&self.content, target);
                 self.adjust_viewport();
@@ -567,6 +591,83 @@ impl Pane {
             }
             PaneAction::ScrollUp(n) => {
                 self.viewport_position_row = self.viewport_position_row.saturating_sub(n);
+            }
+            PaneAction::Tab => {
+                if self.suggestions.is_some() {
+                    self.handle_event(PaneAction::AutocompleteCycleNext);
+                } else if self.cursors.iter().any(|c| c.has_selection()) || self.cursors.primary().is_at_start_of_line(&self.content) {
+                    self.handle_event(PaneAction::Indent);
+                } else {
+                    self.handle_event(PaneAction::Autocomplete);
+                }
+            }
+            PaneAction::BackTab => {
+                if self.suggestions.is_some() {
+                    self.handle_event(PaneAction::AutocompleteCyclePrevious);
+                } else {
+                    self.handle_event(PaneAction::Dedent);
+                }
+            }
+            PaneAction::Autocomplete => {
+                if self.cursors.cursor_count() == 1 && !self.cursors.primary().has_selection() {
+                    let stem = self.cursors.primary().stem(&self.content);
+                    match self.completer.complete(&stem) {
+                        CompletionResult::NoResults => self.inform("no completions".into()),
+                        CompletionResult::ReplaceWith(ins) => {
+                            let stem_start = ByteOffset(self.cursors.primary().offset.0 - stem.len());
+                            let edits = vec![Edit::delete(stem_start, stem.len()), Edit::insert_str(stem_start, ins)];
+                            let edits = EditBatch::from_edits(edits);
+                            self.apply_editbatch(edits);
+                        }
+                        CompletionResult::Menu(suggestion_menu) => {
+                            let ins = suggestion_menu.current();
+                            let stem_start = ByteOffset(self.cursors.primary().offset.0 - stem.len());
+                            let edits = vec![Edit::delete(stem_start, stem.len()), Edit::insert_str(stem_start, ins)];
+                            let edits = EditBatch::from_edits(edits);
+                            self.suggestions = Some(suggestion_menu);
+                            self.apply_editbatch(edits);
+                        }
+                    };
+                }
+            }
+            PaneAction::AutocompleteAcceptSuggestion => {
+                let stem = self.cursors.primary().stem(&self.content);
+                match self.completer.accept(&stem) {
+                    CompletionResult::NoResults => self.inform("no completions".into()),
+                    CompletionResult::ReplaceWith(ins) => {
+                        let stem_start = ByteOffset(self.cursors.primary().offset.0 - stem.len());
+                        let edits = vec![Edit::delete(stem_start, stem.len()), Edit::insert_str(stem_start, ins)];
+                        let edits = EditBatch::from_edits(edits);
+                        self.apply_editbatch(edits);
+                    }
+                    CompletionResult::Menu(_) => {}
+                }
+            }
+            PaneAction::AutocompleteCycleNext => {
+                let edits = match self.suggestions.as_mut() {
+                    Some(menu) => {
+                        let stem_length = menu.current().len();
+                        let stem_start = ByteOffset(self.cursors.primary().offset.0 - stem_length);
+                        menu.cycle_next();
+                        let edits = vec![Edit::delete(stem_start, stem_length), Edit::insert_str(stem_start, menu.current())];
+                        EditBatch::from_edits(edits)
+                    }
+                    None => return
+                };
+                self.apply_editbatch(edits);
+            }
+            PaneAction::AutocompleteCyclePrevious => {
+                let edits = match self.suggestions.as_mut() {
+                    Some(menu) => {
+                        let stem_length = menu.current().len();
+                        let stem_start = ByteOffset(self.cursors.primary().offset.0 - stem_length);
+                        menu.cycle_previous();
+                        let edits = vec![Edit::delete(stem_start, stem_length), Edit::insert_str(stem_start, menu.current())];
+                        EditBatch::from_edits(edits)
+                    }
+                    None => return
+                };
+                self.apply_editbatch(edits);
             }
         }
     }

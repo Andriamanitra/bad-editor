@@ -140,9 +140,11 @@ pub fn get_action(ev: &event::Event) -> Action {
                     else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::EndOfLine)) },
                 KeyCode::PageUp => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Up(25))),
                 KeyCode::PageDown => Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Down(25))),
-                KeyCode::Enter => Action::HandledByPane(PaneAction::InsertNewline),
-                KeyCode::Tab => Action::HandledByPane(PaneAction::Indent),
-                KeyCode::BackTab => Action::HandledByPane(PaneAction::Dedent),
+                KeyCode::Enter =>
+                    if shift { Action::HandledByPane(PaneAction::AutocompleteAcceptSuggestion) }
+                    else     { Action::HandledByPane(PaneAction::InsertNewline) },
+                KeyCode::Tab => Action::HandledByPane(PaneAction::Tab),
+                KeyCode::BackTab => Action::HandledByPane(PaneAction::BackTab),
                 KeyCode::Backspace if ctrl => Action::HandledByPane(PaneAction::DeleteWord),
                 KeyCode::Backspace => Action::HandledByPane(PaneAction::DeleteBackward),
                 // "KeyCode::Backspace if ctrl" only works in terminals that support Kitty Keyboard Protocol.

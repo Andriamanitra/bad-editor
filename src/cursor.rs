@@ -414,6 +414,24 @@ impl Cursor {
             .map(|byte| byte as char)
             .collect()
     }
+    
+    pub fn stem(&self, content: &RopeBuffer) -> String {
+        let mut stem_start = self.offset;
+        for b in content.bytes_at(self.offset).reversed() {
+            if b.is_ascii_whitespace() {
+                break
+            }
+            stem_start.0 -= 1;
+            if b == b'\\' {
+                break
+            }
+        }
+        content.slice(&(stem_start .. self.offset)).to_string()
+    }
+    
+    pub fn is_at_start_of_line(&self, content: &RopeBuffer) -> bool {
+        content.slice(&(self.line_start(content) .. self.offset)).chars().all(|c| c.is_ascii_whitespace())
+    }
 }
 
 #[cfg(test)]
