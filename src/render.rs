@@ -14,6 +14,7 @@ use syntect::highlighting::{FontStyle as SyntectFontStyle, Style as SyntectStyle
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+use crate::completer::SuggestionMenu;
 use crate::highlighter::BadHighlighter;
 use crate::{App, ByteOffset};
 
@@ -157,6 +158,68 @@ const SELECTION_BG: Color = Color::Rgb { r: 0x88, g: 0xff, b: 0xc5 };
 const LIGHT_GREY: Color = Color::Rgb { r: 0xaa, g: 0xaa, b: 0xaa };
 const SLIGHTLY_LIGHTER_BG: Color = Color::Rgb { r: 0x1e, g: 0x1e, b: 0x1e };
 const LIGHTER_BG: Color = Color::Rgb { r: 0x24, g: 0x24, b: 0x24 };
+
+impl SuggestionMenu {
+    // TODO: Renderable trait instead of this nonsense
+    pub fn render(&self, writer: &mut dyn std::io::Write, max_width: usize, style: ContentStyle) -> std::io::Result<()> {
+        let usable_width = max_width - 4;
+        let mut width = 0;
+        width += self.current().width();
+        let mut pre = Vec::new();
+        let mut post = String::new();
+
+        let mut skipped_start = false;
+        let mut skipped_end = false;
+
+        let mut right = self.suggestions[self.current_idx + 1 ..].iter().map(|s| (s, s.width() + 1));
+        if let Some((sugg, w)) = right.next() {
+            if width + w < usable_width {
+                width += w;
+                post.push(' ');
+                post.push_str(sugg);
+            } else {
+                skipped_end = true;
+            }
+        }
+        let left = self.suggestions[0..self.current_idx].iter().rev().map(|s| (s, s.width() + 1));
+        for (sugg, w) in left {
+            if width + w > usable_width {
+                skipped_start = true;
+                break
+            }
+            width += w;
+            pre.push(" ");
+            pre.push(sugg);
+        }
+        for (sugg, w) in right {
+            if width + w > usable_width {
+                skipped_end = true;
+                break
+            }
+            width += w;
+            post.push(' ');
+            post.push_str(sugg);
+        }
+
+        let pre: String = pre.into_iter().rev().collect();
+        writer.queue(crossterm::style::SetStyle(style))?;
+        if skipped_start {
+            writer.queue(Print("< "))?;
+        } else {
+            writer.queue(Print("  "))?;
+        }
+        writer.queue(Print(pre))?;
+        writer.queue(PrintStyledContent(style.reverse().apply(self.current())))?;
+        writer.queue(crossterm::style::SetStyle(style))?;
+        writer.queue(Print(post))?;
+        writer.queue(Clear(ClearType::UntilNewLine))?;
+        if skipped_end {
+            writer.queue(crossterm::cursor::MoveToColumn(max_width as u16 - 1))?;
+            writer.queue(Print(">"))?;
+        }
+        Ok(())
+    }
+}
 
 impl App {
     fn status_line_text_left(&self, ft: &str) -> String {
@@ -370,9 +433,7 @@ impl App {
             // render suggestions
             if primary_cursor_line == lineno {
                 if let Some(suggs) = current_pane.suggestions.as_ref() {
-                    writer.queue(crossterm::style::SetStyle(completions_style))?;
-                    writer.queue(Print(suggs.render(wsize.columns as usize)))?;
-                    writer.queue(Clear(ClearType::UntilNewLine))?;
+                    suggs.render(writer, wsize.columns as usize, completions_style)?;
                     writer.queue(MoveToNextLine(1))?;
                     console_row += 1;
                 }

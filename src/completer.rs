@@ -1,13 +1,11 @@
-use std::collections::VecDeque;
 use std::sync::Arc;
 
 use radix_trie::Trie;
 use radix_trie::TrieCommon;
-use unicode_width::UnicodeWidthStr;
 
 pub struct SuggestionMenu {
-    current_idx: usize,
-    suggestions: Vec<Arc<str>>,
+    pub(crate) current_idx: usize,
+    pub(crate) suggestions: Vec<Arc<str>>,
 }
 
 impl SuggestionMenu {
@@ -29,40 +27,6 @@ impl SuggestionMenu {
         } else {
             self.current_idx = self.suggestions.len().saturating_sub(1);
         }
-    }
-
-    // TODO: Renderable trait instead of this nonsense
-    pub fn render(&self, max_width: usize) -> String {
-        let max_width = max_width - 2;
-        let mut suggs = VecDeque::new();
-        let mut width = 0;
-        width += self.current().width() + 2;
-        suggs.push_back(format!("[{}]", self.current()));
-
-        let mut right = self.suggestions[self.current_idx + 1 ..].iter().map(|s| (s, s.width() + 2));
-        if let Some((sugg, w)) = right.next() {
-            if width + w < max_width {
-                width += w;
-                suggs.push_back(format!(" {sugg} "));
-            }
-        }
-        let left = self.suggestions[0..self.current_idx].iter().rev().map(|s| (s, s.width() + 2));
-        for (sugg, w) in left {
-            if width + w > max_width {
-                break
-            }
-            width += w;
-            suggs.push_front(format!(" {sugg} "));
-        }
-        for (sugg, w) in right {
-            if width + w > max_width {
-                break
-            }
-            width += w;
-            suggs.push_back(format!(" {sugg} "));
-        }
-
-        suggs.into_iter().collect()
     }
 }
 
