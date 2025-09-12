@@ -211,7 +211,7 @@ impl BadHighlighter {
     }
 
     fn memorize_current_state(&mut self) {
-        if self.current_line & 511 == 511 {
+        if self.current_line & 0x69 == 0x69 {
             self.cache.insert(self.current_line, CachedState {
                 parse_state: self.parse_state.clone(),
                 highlight_state: self.highlight_state.clone(),
