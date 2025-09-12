@@ -169,6 +169,7 @@ impl App {
                         "js" => "node %f",
                         "julia" => "julia %f",
                         "lua" => "lua %f",
+                        "perl" => "perl %f",
                         "python" => "uv run %f",
                         "ruby" => "ruby %f",
                         "rust" => "cargo run",
