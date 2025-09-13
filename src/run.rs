@@ -13,6 +13,10 @@ enum AfterActions {
 
 impl App {
     pub fn run(mut self, mut out: &mut dyn std::io::Write) -> Result<(), Box<dyn Error>> {
+        if self.panes.is_empty() {
+            self.switch_to_new_pane(crate::Pane::empty());
+        }
+
         const POLL_TIMEOUT: Duration = Duration::from_millis(16);
 
         let mut need_to_render = true;

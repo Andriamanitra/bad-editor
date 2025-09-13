@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::io::ErrorKind;
 use std::sync::Arc;
 
 use crate::cli::FilePathWithOptionalLocation;
@@ -30,7 +29,7 @@ impl App {
         let highlighting = BadHighlighterManager::new();
         let prompt_completer = CmdCompleter::make_completer(highlighting.filetypes().as_slice());
         Self {
-            panes: vec![Pane::empty()],
+            panes: vec![],
             current_pane_index: 0,
             state: AppState::Idle,
             action_queue: VecDeque::new(),
@@ -42,15 +41,60 @@ impl App {
         }
     }
 
-    pub fn open_file_pane(&mut self, file_loc: &FilePathWithOptionalLocation) {
+    pub(crate) fn switch_to_new_pane(&mut self, pane: Pane) {
+        self.panes.push(pane);
+        self.current_pane_index = self.panes.len() - 1;
+    }
+
+    fn create_pane_from_file(&mut self, file_loc: &FilePathWithOptionalLocation) -> Pane {
         let highlighting = self.highlighting.clone();
-        if let Err(err) = self.current_pane_mut().open_file(file_loc, highlighting) {
-            let fpath = crate::quote_path(file_loc.path.to_string_lossy().as_ref());
-            self.current_pane_mut().inform(match err.kind() {
-                ErrorKind::PermissionDenied => format!("Permission denied: {fpath}"),
-                ErrorKind::IsADirectory => format!("Can not open a directory: {fpath}"),
-                _ => format!("{err}: {fpath}"),
-            });
+        Pane::new_from_file(file_loc, highlighting)
+    }
+
+    fn confirm_saved(&mut self) -> bool {
+        if self.current_pane().modified && self.current_pane().path.is_some() {
+            if let Ok(wsize) = crossterm::terminal::window_size() {
+                let _ = crossterm::execute!(
+                    std::io::stdout(),
+                    crossterm::cursor::MoveTo(0, wsize.height - 1)
+                );
+            }
+            let _ = crossterm::execute!(
+                std::io::stdout(),
+                crossterm::style::Print("save changes to file before closing? (y)es / (n)o / (a)bort")
+            );
+            use crossterm::event::{Event, KeyEvent, KeyCode};
+            loop {
+                let event = crossterm::event::read();
+                if let Ok(Event::Key(KeyEvent { code, .. })) = event {
+                    match code {
+                        KeyCode::Char('Y' | 'y') => {
+                            self.current_pane_mut().save();
+                            return true
+                        }
+                        KeyCode::Char('N' | 'n') => return true,
+                        KeyCode::Char('A' | 'a') => return false,
+                        KeyCode::Esc => return false,
+                        _ => {}
+                    }
+                }
+            }
+        } else {
+            true
+        }
+    }
+
+    pub fn open_file_in_new_pane(&mut self, file_loc: &FilePathWithOptionalLocation) -> &mut Pane {
+        let pane = self.create_pane_from_file(file_loc);
+        self.switch_to_new_pane(pane);
+        let i = self.panes.len() - 1;
+        &mut self.panes[i]
+    }
+
+    pub fn open_file_in_current_pane(&mut self, file_loc: &FilePathWithOptionalLocation) {
+        if self.confirm_saved() {
+            let pane = self.create_pane_from_file(file_loc);
+            self.panes[self.current_pane_index] = pane;
         }
     }
 
@@ -263,7 +307,7 @@ impl App {
                 self.current_pane_mut().save_as(&path, hl);
             }
             Action::Open(path) => {
-                self.open_file_pane(&path);
+                self.open_file_in_current_pane(&path);
             }
             Action::NewPane => {
                 self.panes.push(Pane::empty());
@@ -271,10 +315,7 @@ impl App {
             }
             Action::ClosePane => {
                 if self.panes.len() > 1 {
-                    if self.current_pane().modified && self.current_pane().path.is_some() {
-                        // FIXME: prompt for confirmation
-                        self.current_pane_mut().inform("please save your work before closing the pane".into());
-                    } else {
+                    if self.confirm_saved() {
                         self.panes.remove(self.current_pane_index);
                         self.current_pane_index = self.current_pane_index.saturating_sub(1);
                     }

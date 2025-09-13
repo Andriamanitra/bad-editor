@@ -184,6 +184,45 @@ impl Pane {
         }
     }
 
+    pub fn new_from_file(fileloc: &FilePathWithOptionalLocation, hl: Arc<BadHighlighterManager>) -> Self {
+        let mut pane = Pane::empty();
+        match std::fs::File::open(&fileloc.path) {
+            Ok(file) => {
+                // TODO: do something more efficient than this
+                let mut s = String::new();
+                if BufReader::new(file).read_to_string(&mut s).is_ok() {
+                    pane.content = RopeBuffer::from_str(&s);
+                    pane.path = Some(PathBuf::from(&fileloc.path));
+                } else {
+                    pane.inform("Error reading file".into());
+                }
+            }
+            Err(err) => {
+                let fpath = crate::quote_path(fileloc.path.to_string_lossy().as_ref());
+                match err.kind() {
+                    ErrorKind::NotFound => {
+                        pane.path = Some(PathBuf::from(&fileloc.path));
+                    },
+                    ErrorKind::PermissionDenied => pane.inform(format!("Permission denied: {fpath}")),
+                    ErrorKind::IsADirectory => pane.inform(format!("Can not open a directory: {fpath}")),
+                    _ => pane.inform(format!("{err}: {fpath}")),
+                }
+            }
+        };
+        
+        if let Some(path) = pane.path.as_ref() {
+            pane.title = crate::quote_path(&path.to_string_lossy());
+            pane.highlighter = Some(BadHighlighter::for_file(path, hl));
+            pane.settings = PaneSettings::from_editorconfig(path);
+        }
+        if let Some(line_no) = fileloc.line {
+            let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());
+            pane.cursors.primary_mut().move_to(&pane.content, MoveTarget::Location(line_no, column_no));
+            pane.viewport_position_row = usize::from(line_no).saturating_sub(3);
+        }
+        pane
+    }
+
     pub fn esc(&mut self) {
         if self.cursors.cursor_count() > 1 || self.cursors.primary().has_selection() {
             self.cursors.esc();
@@ -214,35 +253,6 @@ impl Pane {
             Some(hl) => hl.ft(),
             None => "plain",
         }
-    }
-
-    pub fn open_file(&mut self, fileloc: &FilePathWithOptionalLocation, hl: Arc<BadHighlighterManager>) -> std::io::Result<()> {
-        let content = match std::fs::File::open(&fileloc.path) {
-            Ok(file) => {
-                // TODO: do something more efficient than this
-                let mut s = String::new();
-                BufReader::new(file).read_to_string(&mut s)?;
-                RopeBuffer::from_str(&s)
-            }
-            Err(err) if err.kind() == ErrorKind::NotFound => RopeBuffer::new(),
-            Err(err) => return Err(err),
-        };
-        self.title = crate::quote_path(&fileloc.path.to_string_lossy());
-        self.path = Some(PathBuf::from(&fileloc.path));
-        self.content = content;
-        self.cursors = MultiCursor::new();
-        self.lints.clear();
-        self.highlighter = Some(BadHighlighter::for_file(&fileloc.path, hl));
-        self.settings = PaneSettings::from_editorconfig(&fileloc.path);
-        self.modified = false;
-        if let Some(line_no) = fileloc.line {
-            let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());
-            self.cursors.primary_mut().move_to(&self.content, MoveTarget::Location(line_no, column_no));
-            self.viewport_position_row = usize::from(line_no).saturating_sub(3);
-        } else {
-            self.viewport_position_row = 0;
-        }
-        Ok(())
     }
 
     fn set_path(&mut self, path: impl AsRef<Path>, hl: Arc<BadHighlighterManager>) -> std::io::Result<()> {

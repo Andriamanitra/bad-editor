@@ -67,6 +67,7 @@ pub fn parse_cli_args() -> clap::ArgMatches {
         .arg(
             Arg::new("file")
                 .value_parser(open_file_at_loc_parser)
+                .action(clap::ArgAction::Append)
                 .help("File to open, position can be specified via file[:row[:col]]"),
         )
         .get_matches()

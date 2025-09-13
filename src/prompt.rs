@@ -115,14 +115,10 @@ impl App {
                             if let Some(syntax_dir) = self.syntax_dir() {
                                 let fname = format!("{ftype}.sublime-syntax");
                                 let fpath = syntax_dir.join(fname);
-                                let hl = self.highlighting.clone();
-                                if let Ok(()) = self.current_pane_mut().open_file(&fpath.clone().into(), hl) {
-                                    if self.current_pane().path.as_ref().is_some_and(|p| p == &fpath)
-                                    && self.current_pane().content.len_bytes() == 0 {
-                                        let template = include_str!("../default_config/template.sublime-syntax").replace("FTYPE", ftype);
-                                        self.enqueue(Action::HandledByPane(PaneAction::Insert(template)));
-                                        self.enqueue(Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Start)));
-                                    }
+                                let pane = self.open_file_in_new_pane(&FilePathWithOptionalLocation::from(fpath.clone()));
+                                if pane.path.is_some() && pane.content.len_bytes() == 0 {
+                                    let template = include_str!("../default_config/template.sublime-syntax").replace("FTYPE", ftype);
+                                    pane.content = crate::ropebuffer::RopeBuffer::from_str(&template);
                                 }
                             } else {
                                 self.inform("edit error: no config directory".into());
@@ -133,14 +129,11 @@ impl App {
                     }
                     Some("linters") => {
                         if let Some(fpath) = self.linter_script_file() {
-                            let hl = self.highlighting.clone();
-                            if let Ok(()) = self.current_pane_mut().open_file(&fpath.clone().into(), hl) {
-                                if self.current_pane().path.as_ref().is_some_and(|p| p == &fpath)
-                                && self.current_pane().content.len_bytes() == 0 {
-                                    self.enqueue(Action::HandledByPane(PaneAction::Insert(Linter::DEFAULT_LINTER_SCRIPT.to_string())));
-                                    let loc = MoveTarget::Location(NonZero::try_from(32).unwrap(), NonZero::try_from(5).unwrap());
-                                    self.enqueue(Action::HandledByPane(PaneAction::MoveTo(loc)));
-                                }
+                            let pane = self.open_file_in_new_pane(&FilePathWithOptionalLocation::from(fpath));
+                            if pane.path.is_some() && pane.content.len_bytes() == 0 {
+                                self.enqueue(Action::HandledByPane(PaneAction::Insert(Linter::DEFAULT_LINTER_SCRIPT.to_string())));
+                                let loc = MoveTarget::Location(NonZero::try_from(32).unwrap(), NonZero::try_from(5).unwrap());
+                                self.enqueue(Action::HandledByPane(PaneAction::MoveTo(loc)));
                             }
                         } else {
                             self.inform("edit error: no config directory".into());
