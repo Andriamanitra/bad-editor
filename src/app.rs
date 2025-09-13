@@ -36,9 +36,13 @@ impl App {
             highlighting: Arc::new(highlighting),
             prompt_completer,
             clipboard: Clipboard::new(),
-            dirs: directories::ProjectDirs::from("", "Bad", "bad"),
+            dirs: None,
             info: None,
         }
+    }
+
+    pub fn set_project_dirs(&mut self) {
+        self.dirs = directories::ProjectDirs::from("", "Bad", "bad");
     }
 
     pub(crate) fn switch_to_new_pane(&mut self, pane: Pane) {

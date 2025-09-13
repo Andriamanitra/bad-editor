@@ -65,6 +65,12 @@ pub fn parse_cli_args() -> clap::ArgMatches {
     Command::new("bad")
         .version("0.1")
         .arg(
+            Arg::new("clean")
+                .long("clean")
+                .action(clap::ArgAction::SetTrue)
+                .help("Ignore user configuration")
+        )
+        .arg(
             Arg::new("file")
                 .value_parser(open_file_at_loc_parser)
                 .action(clap::ArgAction::Append)
