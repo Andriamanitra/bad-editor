@@ -202,17 +202,7 @@ impl Cursor {
     }
 
     pub fn move_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
-        match target {
-            MoveTarget::Up(_) if self.line_start(content) > ByteOffset(0) => {
-                self.memorized_column.get_or_insert(self.column(content));
-            }
-            MoveTarget::Down(_) if self.line_end(content).0 < content.len_bytes() => {
-                self.memorized_column.get_or_insert(self.column(content));
-            }
-            _ => {
-                self.memorized_column.take();
-            }
-        }
+        self.update_memorize_column(content, target);
         match self.selection() {
             Some(range) if matches!(target, MoveTarget::Left(1)) => {
                 self.move_to_byte(range.start);
@@ -237,18 +227,7 @@ impl Cursor {
     }
 
     pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
-        match target {
-            MoveTarget::Up(_) if self.line_start(content) > ByteOffset(0) => {
-                self.memorized_column.get_or_insert(self.column(content));
-            }
-            MoveTarget::Down(_) if self.line_end(content).0 < content.len_bytes() => {
-                self.memorized_column.get_or_insert(self.column(content));
-            }
-            _ => {
-                self.memorized_column.take();
-            }
-        }
-
+        self.update_memorize_column(content, target);
         if let Some(offset) = self.target_byte_offset(content, target) {
             self.select_to_byte(offset);
         }
@@ -455,6 +434,20 @@ impl Cursor {
 
     pub fn is_at_start_of_line(&self, content: &RopeBuffer) -> bool {
         content.slice(&(self.line_start(content) .. self.offset)).chars().all(|c| c.is_ascii_whitespace())
+    }
+
+    fn update_memorize_column(&mut self, content: &RopeBuffer, target: MoveTarget) {
+        match target {
+            MoveTarget::Up(_) if self.line_start(content) > ByteOffset(0) => {
+                self.memorized_column.get_or_insert(self.column(content));
+            }
+            MoveTarget::Down(_) if self.line_end(content).0 < content.len_bytes() => {
+                self.memorized_column.get_or_insert(self.column(content));
+            }
+            _ => {
+                self.memorized_column.take();
+            }
+        }
     }
 }
 
