@@ -237,6 +237,18 @@ impl Cursor {
     }
 
     pub fn select_to(&mut self, content: &RopeBuffer, target: MoveTarget) {
+        match target {
+            MoveTarget::Up(_) if self.line_start(content) > ByteOffset(0) => {
+                self.memorized_column.get_or_insert(self.column(content));
+            }
+            MoveTarget::Down(_) if self.line_end(content).0 < content.len_bytes() => {
+                self.memorized_column.get_or_insert(self.column(content));
+            }
+            _ => {
+                self.memorized_column.take();
+            }
+        }
+
         if let Some(offset) = self.target_byte_offset(content, target) {
             self.select_to_byte(offset);
         }
@@ -426,7 +438,7 @@ impl Cursor {
             .map(|byte| byte as char)
             .collect()
     }
-    
+
     pub fn stem(&self, content: &RopeBuffer) -> String {
         let mut stem_start = self.offset;
         for b in content.bytes_at(self.offset).reversed() {
@@ -526,6 +538,17 @@ mod tests {
         assert_eq!(cursor.offset, ByteOffset(4));
         cursor.move_to(&r, MoveTarget::EndOfLine);
         assert_eq!(cursor.offset, ByteOffset(7));
+    }
+
+    #[test]
+    fn preferred_column_with_selections() {
+        let r = RopeBuffer::from_str("abcd\nefgh");
+        let mut cursor = Cursor::new_with_selection(ByteOffset(2), Some(ByteOffset(1)));
+        cursor.select_to(&r, MoveTarget::Down(1));
+        assert_eq!(cursor.selection(), Some(ByteOffset(1) .. ByteOffset(7)));
+        cursor.select_to(&r, MoveTarget::Right(1));
+        cursor.select_to(&r, MoveTarget::Up(1));
+        assert_eq!(cursor.selection(), Some(ByteOffset(1) .. ByteOffset(3)));
     }
 
     #[test]
@@ -703,6 +726,5 @@ mod tests {
         let r = RopeBuffer::from_str("\t\tabc");
         let cursor = Cursor::new_with_offset(ByteOffset(from_offset));
         assert_eq!(cursor.target_byte_offset(&r, MoveTarget::StartOfLine), Some(ByteOffset(expected)));
-        
     }
 }
