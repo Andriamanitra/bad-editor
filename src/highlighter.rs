@@ -68,6 +68,7 @@ impl BadHighlighterManager {
                 "string.regexp punctuation.definition.string.begin,string.regexp punctuation.definition.string.end" = "#D92682"
                 "string.regexp" = "#FB7FA8"
                 "support.macro,support.function.macro,variable.macro,entity.name.macro,punctuation.definition.macro" = "#A6E22E"
+                "punctuation.definition.annotation,variable.annotation" = "#A6E22E"
                 "meta.interpolation" = "#FFFFFF"
                 "punctuation.section" = "#D8D8D2"
             ],
