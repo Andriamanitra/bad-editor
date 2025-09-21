@@ -32,6 +32,8 @@ impl MultiCursor {
         self.cursors.len()
     }
 
+    /// Adds a new cursor and sets it as the primary cursor.
+    /// Returns `false` and does nothing if equivalent cursor already exists.
     pub fn spawn_new_primary(&mut self, new: Cursor) -> bool {
         if self.spawn_new(new) {
             self.primary_index = self.cursors.len() - 1;
@@ -41,8 +43,10 @@ impl MultiCursor {
         }
     }
 
+    /// Adds a new cursor.
+    /// Returns `false` and does nothing if equivalent cursor already exists.
     pub fn spawn_new(&mut self, new: Cursor) -> bool {
-        if self.cursors.iter().all(|old| old.offset != new.offset || old.selection_from != new.selection_from) {
+        if self.cursors.iter().all(|old| old.pos() != new.pos()) {
             self.cursors.push(new);
             true
         } else {
@@ -719,5 +723,22 @@ mod tests {
         let r = RopeBuffer::from_str("\t\tabc");
         let cursor = Cursor::new_with_offset(ByteOffset(from_offset));
         assert_eq!(cursor.target_byte_offset(&r, MoveTarget::StartOfLine), Some(ByteOffset(expected)));
+    }
+
+    #[test]
+    fn dont_add_duplicate_cursors() {
+        let r = RopeBuffer::from_str("abc");
+        let mut m = MultiCursor::new();
+        let cursor_with_same_position = Cursor::default();
+        assert!(!m.spawn_new_primary(cursor_with_same_position));
+        assert_eq!(m.cursor_count(), 1);
+
+        m.select_to(&r, MoveTarget::Right(1));
+        let cursor_with_same_selection = Cursor::new_with_selection(ByteOffset(0), Some(ByteOffset(1)));
+        assert!(!m.spawn_new_primary(cursor_with_same_selection));
+        assert_eq!(m.cursor_count(), 1);
+        let cursor_with_rev_selection = Cursor::new_with_selection(ByteOffset(1), Some(ByteOffset(0)));
+        assert!(!m.spawn_new_primary(cursor_with_rev_selection));
+        assert_eq!(m.cursor_count(), 1);
     }
 }
