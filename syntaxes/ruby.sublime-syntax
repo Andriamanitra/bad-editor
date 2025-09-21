@@ -64,7 +64,7 @@ hidden_file_extensions:
 
 first_line_match: |-
   (?xi:
-    ^ \#! .* {{shebang_language}}            # shebang
+    ^ \#! .* \bruby\b                        # shebang
   | ^ \s* \# .*? -\*- .*? \bruby\b .*? -\*-  # editorconfig
   )
 
