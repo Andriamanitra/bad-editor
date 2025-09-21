@@ -712,7 +712,7 @@ mod tests {
     #[case(2, 0)]
     #[case(0, 2)]
     #[case(1, 0)]
-    fn test_home_with_indent(
+    fn home_with_indent(
         #[case] from_offset: usize,
         #[case] expected: usize,
     ) {

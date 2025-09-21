@@ -132,37 +132,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_empty_string() {
+    fn empty_string() {
         assert_eq!(quote_path(""), "''");
     }
 
     #[test]
-    fn test_no_special_chars() {
+    fn no_special_chars() {
         assert_eq!(quote_path("file.txt"), "file.txt");
     }
 
     #[test]
-    fn test_with_space() {
+    fn with_space() {
         assert_eq!(quote_path("my file.txt"), "'my file.txt'");
     }
 
     #[test]
-    fn test_with_special_char() {
+    fn with_special_char() {
         assert_eq!(quote_path("file\n.txt"), "\"file\\n.txt\"");
     }
 
     #[test]
-    fn test_with_single_quote_only() {
+    fn with_single_quote_only() {
         assert_eq!(quote_path("file's.txt"), "\"file's.txt\"");
     }
 
     #[test]
-    fn test_with_double_quote_only() {
+    fn with_double_quote_only() {
         assert_eq!(quote_path("file\"name.txt"), "'file\"name.txt'");
     }
 
     #[test]
-    fn test_with_both_quotes() {
+    fn with_both_quotes() {
         assert_eq!(quote_path("he said: \"don't\""), "\"he said: \\\"don't\\\"\"");
     }
 }

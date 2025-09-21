@@ -418,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_newline_keep_indent_mid_indent() {
+    fn insert_newline_keep_indent_mid_indent() {
         let mut r = RopeBuffer::from_str("    abc");
         let mut cursors = MultiCursor::new();
         cursors.move_to(&r, crate::MoveTarget::Right(2));
