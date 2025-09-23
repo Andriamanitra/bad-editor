@@ -15,7 +15,6 @@ use syntect::highlighting::{
     ThemeSettings,
 };
 use syntect::parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet};
-use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ropebuffer::RopeBuffer;
 
@@ -231,7 +230,7 @@ impl BadHighlighter {
             HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()).collect()
         } else {
             let style = self.manager.highlighter().style_for_stack(self.highlight_state.path.as_slice());
-            line.graphemes(true).map(|g| (style, g)).collect()
+            vec![(style, line)]
         };
         self.current_line += 1;
         self.memorize_current_state();
