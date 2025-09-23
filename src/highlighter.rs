@@ -15,6 +15,7 @@ use syntect::highlighting::{
     ThemeSettings,
 };
 use syntect::parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ropebuffer::RopeBuffer;
 
@@ -118,6 +119,8 @@ pub struct BadHighlighter {
 }
 
 impl BadHighlighter {
+    const MAX_LINE_LENGTH_FOR_HIGHLIGHTING: usize = 1024;
+
     pub fn for_file<P: AsRef<std::path::Path>>(file_path: P, manager: Arc<BadHighlighterManager>) -> Self {
         let syntax = match manager.syntax_set.find_syntax_for_file(file_path) {
             Ok(Some(s)) => s,
@@ -132,10 +135,9 @@ impl BadHighlighter {
     }
 
     fn for_syntax(syntax: &SyntaxReference, manager: Arc<BadHighlighterManager>) -> Self {
-        let highlighter = Highlighter::new(&manager.theme);
         let initial_parse_state = ParseState::new(syntax);
         let parse_state = initial_parse_state.clone();
-        let highlight_state = HighlightState::new(&highlighter, ScopeStack::new());
+        let highlight_state = HighlightState::new(&manager.highlighter(), ScopeStack::new());
         Self {
             filetype: syntax.name.clone(),
             manager,
@@ -205,8 +207,10 @@ impl BadHighlighter {
     }
 
     fn parse_line(&mut self, line: &str) {
-        let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
-        for _ in HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()) {}
+        if line.len() <= Self::MAX_LINE_LENGTH_FOR_HIGHLIGHTING {
+            let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
+            for _ in HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()) {}
+        }
         self.current_line += 1;
         self.memorize_current_state();
     }
@@ -222,8 +226,13 @@ impl BadHighlighter {
     }
 
     pub fn highlight_line<'t>(&mut self, line: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
-        let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
-        let highlights = HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()).collect::<Vec<_>>();
+        let highlights: Vec<(Style, &'t str)> = if line.len() <= Self::MAX_LINE_LENGTH_FOR_HIGHLIGHTING {
+            let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
+            HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()).collect()
+        } else {
+            let style = self.manager.highlighter().style_for_stack(self.highlight_state.path.as_slice());
+            line.graphemes(true).map(|g| (style, g)).collect()
+        };
         self.current_line += 1;
         self.memorize_current_state();
         highlights.into_iter()
