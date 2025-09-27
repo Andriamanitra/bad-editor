@@ -218,7 +218,8 @@ impl Pane {
         if let Some(line_no) = fileloc.line {
             let column_no = fileloc.column.unwrap_or(NonZeroUsize::new(1).unwrap());
             pane.cursors.primary_mut().move_to(&pane.content, MoveTarget::Location(line_no, column_no));
-            pane.viewport_position_row = usize::from(line_no).saturating_sub(3);
+            let cursor_line_no = pane.cursors.primary().current_line_number(&pane.content);
+            pane.viewport_position_row = cursor_line_no.saturating_sub(3);
         }
         pane
     }
