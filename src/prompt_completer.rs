@@ -24,11 +24,10 @@ impl CmdCompleter {
                 CmdBuilder::new("edit")
                     .args(
                         argchoice![
-                            "linters",
                             argseq!["syntax", Arg::OneOf(filetypes.clone())]
                         ]
                     )
-                    .help("edit linters | edit syntax FILETYPE")
+                    .help("edit syntax FILETYPE")
                     .build(),
                 CmdBuilder::new("exec").alias("x")
                     .args(Arg::String)

@@ -16,7 +16,6 @@ use reedline::{
 use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
 use crate::exec::execute_interactive_command_from_template;
-use crate::linter::Linter;
 use crate::prompt_completer::CmdCompleter;
 use crate::{Action, App, MoveTarget, PaneAction};
 
@@ -127,18 +126,6 @@ impl App {
                             self.inform("Usage: edit syntax FTYPE".into());
                         }
                     }
-                    Some("linters") => {
-                        if let Some(fpath) = self.linter_script_file() {
-                            let pane = self.open_file_in_new_pane(&FilePathWithOptionalLocation::from(fpath));
-                            if pane.path.is_some() && pane.content.len_bytes() == 0 {
-                                self.enqueue(Action::HandledByPane(PaneAction::Insert(Linter::DEFAULT_LINTER_SCRIPT.to_string())));
-                                let loc = MoveTarget::Location(NonZero::try_from(32).unwrap(), NonZero::try_from(5).unwrap());
-                                self.enqueue(Action::HandledByPane(PaneAction::MoveTo(loc)));
-                            }
-                        } else {
-                            self.inform("edit error: no config directory".into());
-                        }
-                    }
                     _ => {
                         self.inform(format!("edit error: invalid argument {arg:?}"));
                     }
@@ -193,14 +180,10 @@ impl App {
                     return
                 }
                 self.current_pane_mut().lints.clear();
-                // TODO: run the linter asynchronously in the background
                 let fname = self.current_pane().path.as_ref().and_then(|p| p.to_str());
                 let ft = self.current_pane().filetype();
-                let linter = match self.linter_script_file() {
-                    Some(custom_script) => crate::linter::Linter::init(custom_script),
-                    None => crate::linter::Linter::init_default(),
-                };
-                match linter.run_linter_command(fname, ft) {
+                // TODO: run the linter asynchronously in the background
+                match crate::linter::run_linter_command(fname, ft) {
                     Ok(mut lints_by_filename) => {
                         for pane in self.panes.iter_mut() {
                             if let Some(path) = &pane.path {

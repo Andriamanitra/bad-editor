@@ -13,7 +13,6 @@ clap = "4.5.42"
 crossterm = { version = "0.29.0" }
 directories = "6.0.0"
 ec4rs = "1.2.0"
-janetrs = { version = "0.8.0", features = ["amalgation"] }
 libc = "0.2.175"
 nu-ansi-term = "0.50.1"
 radix_trie = "0.2.1"
