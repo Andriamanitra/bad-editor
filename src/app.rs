@@ -7,6 +7,11 @@ use crate::highlighter::BadHighlighterManager;
 use crate::prompt_completer::CmdCompleter;
 use crate::{Action, Pane};
 
+#[cfg(not(target_os = "android"))]
+type PlatformClipboard = crate::clipboard::arboard::ArboardClipboard;
+#[cfg(target_os = "android")]
+type PlatformClipboard = crate::clipboard::termux::TermuxClipboard;
+
 pub(crate) enum AppState {
     Idle,
     InPrompt,
@@ -19,7 +24,7 @@ pub struct App {
     pub(crate) action_queue: VecDeque<Action>,
     pub(crate) highlighting: Arc<BadHighlighterManager>,
     pub(crate) prompt_completer: CmdCompleter,
-    pub(crate) clipboard: Clipboard,
+    pub(crate) clipboard: PlatformClipboard,
     pub(crate) dirs: Option<directories::ProjectDirs>,
     info: Option<String>,
 }
@@ -35,7 +40,7 @@ impl App {
             action_queue: VecDeque::new(),
             highlighting: Arc::new(highlighting),
             prompt_completer,
-            clipboard: Clipboard::new(),
+            clipboard: PlatformClipboard::new(),
             dirs: None,
             info: None,
         }
