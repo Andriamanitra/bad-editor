@@ -164,8 +164,8 @@ impl Cursor {
             MoveTarget::Down(n) => Some(self.down(content, n)),
             MoveTarget::Left(n) => Some(self.left(content, n)),
             MoveTarget::Right(n) => Some(self.right(content, n)),
-            MoveTarget::Start => Some(ByteOffset(0)),
-            MoveTarget::End => Some(ByteOffset(content.len_bytes())),
+            MoveTarget::StartOfFile => Some(ByteOffset(0)),
+            MoveTarget::EndOfFile => Some(ByteOffset(content.len_bytes())),
             MoveTarget::StartOfLine => {
                 let line_start = self.line_start(content);
                 let indent_len = content

@@ -498,7 +498,7 @@ impl Pane {
                 self.cursors.esc();
                 let cursor = self.cursors.primary_mut();
                 cursor.offset = ByteOffset(0);
-                cursor.select_to(&self.content, MoveTarget::End);
+                cursor.select_to(&self.content, MoveTarget::EndOfFile);
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);

@@ -458,7 +458,7 @@ mod tests {
         assert_eq!(expected_length_after % indent_width, 0);
         let mut r = RopeBuffer::from_str(&" ".repeat(n_spaces));
         let mut cursors = MultiCursor::new();
-        cursors.move_to(&r, crate::MoveTarget::End);
+        cursors.move_to(&r, crate::MoveTarget::EndOfFile);
         let edits = EditBatch::delete_backward_with_cursors(&cursors, &r, indent_width);
         r.do_edits(&mut cursors, edits);
         assert_eq!(r.len_bytes(), expected_length_after);
@@ -473,7 +473,7 @@ mod tests {
     fn test_delete_to_tabstop(#[case] before: &str, #[case] after: &str) {
         let mut r = RopeBuffer::from_str(before);
         let mut cursors = MultiCursor::new();
-        cursors.move_to(&r, crate::MoveTarget::End);
+        cursors.move_to(&r, crate::MoveTarget::EndOfFile);
         let edits = EditBatch::delete_backward_with_cursors(&cursors, &r, 4);
         r.do_edits(&mut cursors, edits);
         assert_eq!(&r.to_string(), after);

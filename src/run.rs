@@ -136,14 +136,14 @@ pub fn get_action(ev: &event::Event) -> Action {
                     else          { Action::HandledByPane(PaneAction::MoveTo(target)) }
                 }
                 KeyCode::Home if ctrl =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::Start)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::Start)) },
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::StartOfFile)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::StartOfFile)) },
                 KeyCode::Home =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::StartOfLine)) }
                     else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::StartOfLine)) },
                 KeyCode::End if ctrl =>
-                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::End)) }
-                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::End)) },
+                    if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::EndOfFile)) }
+                    else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::EndOfFile)) },
                 KeyCode::End =>
                     if shift { Action::HandledByPane(PaneAction::SelectTo(MoveTarget::EndOfLine)) }
                     else     { Action::HandledByPane(PaneAction::MoveTo(MoveTarget::EndOfLine)) },
