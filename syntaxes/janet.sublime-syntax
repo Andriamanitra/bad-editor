@@ -8,6 +8,7 @@ file_extensions:
 
 variables:
   non_ident: '[ \t\r\n()`''"\[\]\{\}|,;~@]'
+  shorthand_chars: '['';~,|]'
   identifier: '[^\s\[\](){}`''"|,;~@#:0-9][^\s\[\](){}`''"|,;~@#]*'
   special_forms: '(?:def|var|fn|do|quote|if|splice|while|break|set|quasiquote|unquote|upscope)'
   macros: |-
@@ -112,6 +113,8 @@ contexts:
       scope: keyword.janet
     - match: '''{{identifier}}'
       scope: string.unquoted.janet
+    - match: '{{shorthand_chars}}'
+      scope: keyword.operator.janet
     - match: ':{{identifier}}'
       scope: constant.other.janet
     - match: '{{identifier}}'
