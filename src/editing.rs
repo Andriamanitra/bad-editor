@@ -113,7 +113,10 @@ impl EditBatch {
         Self::from_edits(edits)
     }
 
-    pub fn delete_backward_with_cursors(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
+    /// Typically deletes one grapheme cluster backward. If the current line up
+    /// to the cursor only contains spaces then delete backwards to the nearest
+    /// tab stop.
+    pub fn delete_backward_with_cursors(cursors: &MultiCursor, content: &RopeBuffer, indent_width: usize) -> Self {
         let mut edits = vec![];
         for cursor in cursors.iter() {
             match cursor.selection() {
@@ -121,7 +124,17 @@ impl EditBatch {
                     edits.push(Edit::Delete(selection));
                 }
                 None => {
-                    let a = cursor.left(content, 1);
+                    let mut deleted_count = 1;
+                    if cursor.is_at_start_of_line(content) {
+                        let indent_str = cursor.current_line_indentation(content);
+                        if !indent_str.is_empty() && indent_str.bytes().all(|b| b == b' ') {
+                            deleted_count = match indent_str.len() % indent_width {
+                                0 => indent_width,
+                                n => n,
+                            }
+                        }
+                    }
+                    let a = cursor.left(content, deleted_count);
                     let b = cursor.offset;
                     if a != b {
                         edits.push(Edit::Delete(a..b));
@@ -312,6 +325,7 @@ impl Ord for Edit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
     #[test]
     fn non_overlapping_deletes() {
@@ -425,5 +439,43 @@ mod tests {
         let edits = EditBatch::insert_newline_keep_indent(&cursors, &r, "\n");
         r.do_edits(&mut cursors, edits);
         assert_eq!(r.to_string(), "  \n    abc")
+    }
+
+    #[rstest]
+    #[case(4, 4, 0)]
+    #[case(5, 4, 4)]
+    #[case(7, 4, 4)]
+    #[case(8, 4, 4)]
+    #[case(2, 2, 0)]
+    #[case(7, 2, 6)]
+    #[case(7, 8, 0)]
+    #[case(15, 8, 8)]
+    fn test_delete_to_tabstop_spaces(
+        #[case] n_spaces: usize,
+        #[case] indent_width: usize,
+        #[case] expected_length_after: usize,
+    ) {
+        assert_eq!(expected_length_after % indent_width, 0);
+        let mut r = RopeBuffer::from_str(&" ".repeat(n_spaces));
+        let mut cursors = MultiCursor::new();
+        cursors.move_to(&r, crate::MoveTarget::End);
+        let edits = EditBatch::delete_backward_with_cursors(&cursors, &r, indent_width);
+        r.do_edits(&mut cursors, edits);
+        assert_eq!(r.len_bytes(), expected_length_after);
+    }
+
+    #[rstest]
+    #[case("", "")]
+    #[case("\t", "")]
+    #[case("\t\t", "\t")]
+    #[case("\t\t ", "\t\t")]
+    #[case("\t\t  ", "\t\t ")]
+    fn test_delete_to_tabstop(#[case] before: &str, #[case] after: &str) {
+        let mut r = RopeBuffer::from_str(before);
+        let mut cursors = MultiCursor::new();
+        cursors.move_to(&r, crate::MoveTarget::End);
+        let edits = EditBatch::delete_backward_with_cursors(&cursors, &r, 4);
+        r.do_edits(&mut cursors, edits);
+        assert_eq!(&r.to_string(), after);
     }
 }

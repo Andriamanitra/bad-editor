@@ -519,7 +519,7 @@ impl Pane {
                 }
             }
             PaneAction::DeleteBackward => {
-                let edits = EditBatch::delete_backward_with_cursors(&self.cursors, &self.content);
+                let edits = EditBatch::delete_backward_with_cursors(&self.cursors, &self.content, self.settings.indent_size);
                 self.apply_editbatch(edits);
                 for cursor in self.cursors.iter_mut() {
                     cursor.deselect();
