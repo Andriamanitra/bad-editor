@@ -54,6 +54,7 @@ impl App {
         let (command, arg) = s.split_once(' ').unwrap_or((s, ""));
         match command {
             "exit" | "quit" | "q" | ":q" => self.enqueue(Action::Quit),
+            "close" => self.enqueue(Action::ClosePane),
             "find" => self.enqueue(Action::HandledByPane(PaneAction::Find(arg.to_string()))),
             "goto" => {
                 if let Some(target) = parse_target(arg) {

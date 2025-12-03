@@ -21,6 +21,9 @@ impl CmdCompleter {
 
         CmdCompleter {
             cmds: vec![
+                CmdBuilder::new("close")
+                    .help("close")
+                    .build(),
                 CmdBuilder::new("edit")
                     .args(
                         argchoice![
