@@ -91,7 +91,7 @@ pub fn get_action(ev: &event::Event) -> Action {
             // TODO: no hard coding, read keybindings from a config file
             match code {
                 KeyCode::Char('q') if ctrl => Action::Quit,
-                KeyCode::Char('w') if ctrl => Action::ClosePane,
+                KeyCode::Char('w') if ctrl => Action::HandledByPane(PaneAction::DeleteWord),
                 KeyCode::Char('t') if ctrl => Action::NewPane,
                 KeyCode::Char('e') if ctrl => Action::CommandPrompt,
                 KeyCode::Char('o') if ctrl => Action::CommandPromptEdit("open ".into()),
