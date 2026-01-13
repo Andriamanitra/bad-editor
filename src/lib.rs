@@ -7,6 +7,7 @@ mod exec;
 mod highlighter;
 mod linter;
 mod pane;
+mod pane_settings;
 mod prompt;
 mod prompt_completer;
 mod render;

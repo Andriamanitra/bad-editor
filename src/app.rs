@@ -153,8 +153,8 @@ impl App {
         match setting {
             "autoindent" => {
                 self.current_pane_mut().settings.autoindent = match new_value {
-                    "off" => crate::pane::AutoIndent::None,
-                    "keep" => crate::pane::AutoIndent::Keep,
+                    "off" => crate::pane_settings::AutoIndent::None,
+                    "keep" => crate::pane_settings::AutoIndent::Keep,
                     _ => {
                         self.inform("set error: autoindent must be one of: off, keep".into());
                         return
