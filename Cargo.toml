@@ -31,6 +31,7 @@ rstest = "0.26.1"
 
 [build-dependencies]
 syntect = "5.2.0"
+ec4rs = "1.2.0"
 
 [features]
 # Enable the `wayland-data-control` feature of arboard.

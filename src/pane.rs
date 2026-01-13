@@ -11,7 +11,7 @@ use crate::highlighter::{BadHighlighter, BadHighlighterManager};
 use crate::linter::Lint;
 use crate::pane_settings::{AutoIndent, PaneSettings};
 use crate::ropebuffer::RopeBuffer;
-use crate::{ByteOffset, IndentKind, MoveTarget, MultiCursor};
+use crate::{ByteOffset, MoveTarget, MultiCursor};
 
 #[derive(Debug, Clone)]
 pub enum PaneAction {

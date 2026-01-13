@@ -1,0 +1,29 @@
+[Makefile]
+indent_style = tab
+
+[*.go]
+indent_style = tab
+
+[*.hs]
+indent_size = 2
+
+[*.janet]
+indent_size = 2
+
+[*.json]
+indent_size = 2
+
+[*.lua]
+indent_size = 2
+
+[*.rb]
+indent_size = 2
+
+[*.typ]
+indent_size = 2
+
+[*.yaml]
+indent_size = 2
+
+[*.yml]
+indent_size = 2
