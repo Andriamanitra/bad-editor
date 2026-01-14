@@ -233,7 +233,9 @@ impl Arg {
             Arg::Seq(args) => {
                 let mut s = s;
                 let mut s_offset = s_offset;
-                let last_index = args.len() - 1;
+                let Some(last_index) = args.len().checked_sub(1) else {
+                    return ArgCompleteResult::NoMatch
+                };
                 for (i, arg) in args.iter().enumerate() {
                     match arg.complete(s, s_offset, i == last_index) {
                         ArgCompleteResult::SkipTo(i) => {
