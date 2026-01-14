@@ -27,6 +27,11 @@
             (seq [line :in (file/lines tempf) :let [lint (peg/match lint-peg line)] :when lint]
               (struct ;lint))))))
 
+
+(defn print-lints [lints]
+  (each L lints
+    (print (L :filename) ":" (L :line) ":" (L :column) ":" (L :severity) ":" (L :message))))
+
 (defn lint [LANGUAGE FILENAME]
   (let [
     cargo-clippy {
@@ -75,13 +80,13 @@
     }
    ]
     (case LANGUAGE
-     :bash (lint-with shellcheck)
-     :c (lint-with clang)
-     :c++ (lint-with g++)
-     :haskell (lint-with ghc)
-     :js (lint-with quick-lint-js)
-     :lua (lint-with luacheck)
-     :python (lint-with ruff mypy)
-     :ruby (lint-with rubocop)
-     :rust (lint-with cargo-clippy)
-     (string "you need to set up a linter for "LANGUAGE" in linters.janet"))))
+     "bash" (print-lints (lint-with shellcheck))
+     "c" (print-lints (lint-with clang))
+     "c++" (print-lints (lint-with g++))
+     "haskell" (print-lints (lint-with ghc))
+     "js" (print-lints (lint-with quick-lint-js))
+     "lua" (print-lints (lint-with luacheck))
+     "python" (print-lints (lint-with ruff mypy))
+     "ruby" (print-lints (lint-with rubocop))
+     "rust" (print-lints (lint-with cargo-clippy))
+     (eprin "no linter for ft:" LANGUAGE))))
