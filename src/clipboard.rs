@@ -9,7 +9,8 @@ pub trait Clipboard {
 }
 
 #[derive(Debug)]
-#[non_exhaustive]
+#[non_exhaustive]  // adding new error variants is not a breaking change
+#[allow(dead_code)]  // some variants may never be constructed on certain platforms
 pub enum ClipboardError {
     ContentNotAvailable,
     NotSupported,
