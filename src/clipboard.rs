@@ -9,11 +9,13 @@ pub trait Clipboard {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ClipboardError {
     ContentNotAvailable,
     NotSupported,
     Occupied,
     ConversionFailure,
+    TermuxApiError(&'static str),
     Unknown { description: String }
 }
 
@@ -27,6 +29,7 @@ impl Display for ClipboardError {
                 ClipboardError::NotSupported => "external clipboard not supported",
                 ClipboardError::Occupied => "external clipboard is occupied by another program",
                 ClipboardError::ConversionFailure => "invalid format for external clipboard",
+                ClipboardError::TermuxApiError(msg) => msg,
                 ClipboardError::Unknown { description } => description,
             }
         )
@@ -97,6 +100,8 @@ pub mod termux {
     use crate::clipboard::Clipboard;
     use crate::clipboard::ClipboardError;
 
+    const TIMEOUT: std::time::Duration = std::time::Duration::from_millis(800);
+
     pub struct TermuxClipboard {
         clips: Vec<String>
     }
@@ -108,46 +113,39 @@ pub mod termux {
 
         fn copy(&mut self, content: Vec<String>) -> Result<(), ClipboardError> {
             self.clips = content;
-            let s = self.clips.join("\n");
-            let status = std::process::Command::new("termux-clipboard-set")
-                .arg(&s)
-                .status()
-                .map_err(|_| ClipboardError::Unknown {
-                    description: "unable to run termux-clipboard-get (is termux-api installed?)".to_string()
-                })?;
-            match status.code() {
-                Some(0) => Ok(()),
-                Some(code) => Err(ClipboardError::Unknown {
-                    description: format!("termux-clipboard-set exited with {code}")
-                }),
-                None => Err(ClipboardError::Unknown {
-                    description: "termux-clipboard-set was terminated by a signal".to_string()
-                }),
+            let termux_clipboard_set = duct::cmd!("termux-clipboard-set", self.clips.join("\n"))
+                .start()
+                .map_err(|_| ClipboardError::TermuxApiError("unable to run termux-clipboard-set (is termux-api installed?)"))?;
+            match termux_clipboard_set.wait_timeout(TIMEOUT) {
+                Ok(Some(_)) => Ok(()),
+                Ok(None) => {
+                    termux_clipboard_set.kill().expect("killing termux-clipboard-set should never fail");
+                    Err(ClipboardError::TermuxApiError("termux-clipboard-set timed out (is Termux:API installed?)"))
+                }
+                Err(err) => Err(ClipboardError::Unknown { description: err.to_string() }),
             }
         }
 
         fn update_from_external(&mut self) -> Result<(), ClipboardError> {
-            let out = std::process::Command::new("termux-clipboard-get")
-                .output()
-                .map_err(|_| ClipboardError::Unknown {
-                    description: "unable to run termux-clipboard-get (is termux-api installed?)".to_string()
-                })?;
-            match out.status.code() {
-                Some(0) => {
-                    match String::from_utf8(out.stdout) {
+            let termux_clipboard_get = duct::cmd!("termux-clipboard-get")
+                .start()
+                .map_err(|_| ClipboardError::TermuxApiError("unable to run termux-clipboard-get (is termux-api installed?)"))?;
+
+            match termux_clipboard_get.wait_timeout(TIMEOUT) {
+                Ok(Some(output)) => {
+                    match String::from_utf8(output.stdout.to_owned()) {
                         Ok(txt) => {
                             self.clips = vec![txt];
                             Ok(())
                         }
-                        Err(_) => Err(ClipboardError::ConversionFailure),
+                        Err(_) => Err(ClipboardError::ConversionFailure)
                     }
-                },
-                Some(code) => Err(ClipboardError::Unknown {
-                    description: format!("termux-clipboard-get exited with {code}")
-                }),
-                None => Err(ClipboardError::Unknown {
-                    description: "termux-clipboard-set was terminated by a signal".to_string()
-                }),
+                }
+                Ok(None) => {
+                    termux_clipboard_get.kill().expect("killing termux-clipboard-get should never fail");
+                    Err(ClipboardError::TermuxApiError("termux-clipboard-get timed out (is Termux:API installed?)"))
+                }
+                Err(err) => Err(ClipboardError::Unknown { description: err.to_string() })
             }
         }
 
