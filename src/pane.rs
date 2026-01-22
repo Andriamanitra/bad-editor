@@ -628,4 +628,19 @@ mod tests {
         pane.handle_event(PaneAction::Insert("<".into()));
         assert_eq!(pane.content.to_string(), "<{[(\"'hello'\")]}>");
     }
+
+    #[test]
+    // FIXME
+    #[ignore = "known bug: the two cursors end up in the same position during editing"]
+    fn surround_two_adjacent_selections() {
+        let mut pane = Pane::empty();
+        pane.handle_event(PaneAction::Insert("murmur".into()));
+        pane.handle_event(PaneAction::MoveTo(MoveTarget::StartOfFile));
+        pane.handle_event(PaneAction::SelectTo(MoveTarget::Right(3)));
+        pane.handle_event(PaneAction::QuickAddNext);
+        pane.handle_event(PaneAction::Insert("[".into()));
+        assert_eq!(pane.content.to_string(), "[mur][mur]");
+        pane.handle_event(PaneAction::Insert("(".into()));
+        assert_eq!(pane.content.to_string(), "([mur])([mur])");
+    }
 }
