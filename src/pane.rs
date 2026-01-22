@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{BufReader, ErrorKind, Read, Write};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -326,10 +327,14 @@ impl Pane {
     pub(crate) fn transform_selections<F>(&mut self, transform: F)
         where F: Fn(String) -> Option<String>
     {
-        let edits = EditBatch::transform_selections(&self.cursors, &self.content, transform);
+        let (edits, new_sizes) = EditBatch::transform_selections(&self.cursors, &self.content, transform);
         self.apply_editbatch(edits);
-        for cursor in self.cursors.iter_mut() {
-            cursor.deselect();
+        for (cursor, sel_size) in self.cursors.iter_mut().zip(new_sizes) {
+            if sel_size > 0 {
+                cursor.selection_from = Some(ByteOffset(cursor.offset.0 - sel_size));
+            } else {
+                cursor.deselect();
+            }
         }
     }
 
@@ -359,6 +364,19 @@ impl Pane {
     }
 
     pub(crate) fn handle_event(&mut self, event: PaneAction) {
+        let quotes = {
+            static PAIRS: std::sync::OnceLock<HashMap<&str, &str>> = std::sync::OnceLock::new();
+            PAIRS.get_or_init(||
+                HashMap::from([
+                    ("(", ")"), (")", "("),
+                    ("[", "]"), ("]", "["),
+                    ("{", "}"), ("}", "{"),
+                    ("<", ">"), (">", "<"),
+                    ("'", "'"), ("\"", "\""),
+                ])
+            )
+        };
+
         match event {
             PaneAction::ScrollDown(_) => (),
             PaneAction::ScrollUp(_) => (),
@@ -400,6 +418,14 @@ impl Pane {
                 let cursor = self.cursors.primary_mut();
                 cursor.offset = ByteOffset(0);
                 cursor.select_to(&self.content, MoveTarget::EndOfFile);
+            }
+            PaneAction::Insert(l_quote)
+                if self.cursors.primary().has_selection()
+                    && quotes.contains_key(l_quote.as_str()) =>
+            {
+                if let Some(r_quote) = quotes.get(l_quote.as_str()) {
+                    self.transform_selections(|s| Some(format!("{l_quote}{s}{r_quote}")));
+                }
             }
             PaneAction::Insert(s) => {
                 let edits = EditBatch::insert_with_cursors(&self.cursors, &s);
@@ -582,5 +608,24 @@ impl Pane {
                 self.apply_editbatch(edits);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn surround_selection() {
+        let mut pane = Pane::empty();
+        pane.handle_event(PaneAction::Insert("hello".into()));
+        pane.handle_event(PaneAction::SelectAll);
+        pane.handle_event(PaneAction::Insert("'".into()));
+        pane.handle_event(PaneAction::Insert("\"".into()));
+        pane.handle_event(PaneAction::Insert("(".into()));
+        pane.handle_event(PaneAction::Insert("[".into()));
+        pane.handle_event(PaneAction::Insert("{".into()));
+        pane.handle_event(PaneAction::Insert("<".into()));
+        assert_eq!(pane.content.to_string(), "<{[(\"'hello'\")]}>");
     }
 }

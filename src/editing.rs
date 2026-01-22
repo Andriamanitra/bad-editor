@@ -84,19 +84,23 @@ impl EditBatch {
         }
     }
 
-    pub fn transform_selections<F>(cursors: &MultiCursor, content: &RopeBuffer, transform: F) -> Self
+    pub fn transform_selections<F>(cursors: &MultiCursor, content: &RopeBuffer, transform: F) -> (Self, Vec<usize>)
         where F: Fn(String) -> Option<String>
     {
         let mut edits = vec![];
+        let mut selection_sizes_after = vec![];
         for cursor in cursors.iter() {
+            let mut new_size = 0;
             if let Some(selection) = cursor.selection() {
                 if let Some(replacement) = transform(content.slice(&selection).to_string()) {
                     edits.push(Edit::insert_str(selection.start, &replacement));
+                    new_size = replacement.len();
                 }
                 edits.push(Edit::Delete(selection));
             }
+            selection_sizes_after.push(new_size);
         }
-        Self::from_edits(edits)
+        (Self::from_edits(edits), selection_sizes_after)
     }
 
     pub fn cut(cursors: &MultiCursor, content: &RopeBuffer) -> Self {
