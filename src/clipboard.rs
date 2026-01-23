@@ -24,7 +24,7 @@ impl Error for ClipboardError {}
 
 impl Display for ClipboardError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "clipboard error: {}", 
+        write!(f, "clipboard error: {}",
             match self {
                 ClipboardError::ContentNotAvailable => "content from external clipboard not available",
                 ClipboardError::NotSupported => "external clipboard not supported",
@@ -115,6 +115,8 @@ pub mod termux {
         fn copy(&mut self, content: Vec<String>) -> Result<(), ClipboardError> {
             self.clips = content;
             let termux_clipboard_set = duct::cmd!("termux-clipboard-set", self.clips.join("\n"))
+                .stdout_null()
+                .stderr_null()
                 .start()
                 .map_err(|_| ClipboardError::TermuxApiError("unable to run termux-clipboard-set (is termux-api installed?)"))?;
             match termux_clipboard_set.wait_timeout(TIMEOUT) {
@@ -129,6 +131,8 @@ pub mod termux {
 
         fn update_from_external(&mut self) -> Result<(), ClipboardError> {
             let termux_clipboard_get = duct::cmd!("termux-clipboard-get")
+                .stdout_capture()
+                .stderr_null()
                 .start()
                 .map_err(|_| ClipboardError::TermuxApiError("unable to run termux-clipboard-get (is termux-api installed?)"))?;
 
