@@ -2425,7 +2425,7 @@ contexts:
   constants:
     - include: booleans
     - include: nones
-    - match: (?:Ellipsis|NotImplemented|__debug__)\b
+    - match: (?:Ellipsis|NotImplemented|__debug__|__name__)\b
       scope: constant.language.python
       push: illegal-assignment
     - match: \.{3}(?!\w)
