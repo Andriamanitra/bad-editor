@@ -59,8 +59,8 @@
       :lint-format [:s+ :filename ":" :line ":" :column ":" :message :severity-from-message]
     }
     mypy {
-      :command ["uvx" "mypy" "--strict" FILENAME]
-      :lint-format [:filename ":" :line ":" :message :severity-from-message]
+      :command ["uvx" "mypy" "--strict" "--show-column-numbers" FILENAME]
+      :lint-format [:filename ":" :line ":" :column ":" :message :severity-from-message]
     }
     rubocop {
       :command ["rubocop" "--format=clang" FILENAME]
