@@ -434,7 +434,7 @@ impl App {
                 let left_scroll_indicator = if ctx.visible_from_column > 0 { '<' } else { ' ' };
                 let sidebar = format!(" {one_based_lineno:max_lineno_width$}{left_scroll_indicator}");
                 let mut lineno_style = lineno_style;
-                for lint in current_pane.lints.iter().filter(|lint| lint.lineno() == one_based_lineno) {
+                if let Some(lint) = current_pane.lints.iter().find(|lint| lint.lineno() == one_based_lineno) {
                     lineno_style = lineno_style.with(lint.color());
                 }
                 writer.queue(PrintStyledContent(lineno_style.apply(&sidebar)))?;

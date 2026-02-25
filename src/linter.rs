@@ -14,6 +14,7 @@ type ColNo = NonZero<usize>;
 
 pub(crate) const DEFAULT_LINTER_SCRIPT: &str = include_str!("../default_config/linters.janet");
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum Severity {
     Info,
     Warning,
@@ -145,6 +146,9 @@ pub fn run_linter_command(script_path: Option<PathBuf>, filename: Option<&str>, 
                     let entry: &mut Vec<Lint> = lints.entry(k).or_default();
                     entry.push(lint);
                 }
+            }
+            for lints_for_file in lints.values_mut() {
+                lints_for_file.sort_by(|a, b| b.level.cmp(&a.level));
             }
             Ok(lints)
         }
