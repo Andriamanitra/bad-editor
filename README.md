@@ -3,16 +3,16 @@
 The world obviously needs more [text editors](https://github.com/stars/Andriamanitra/lists/editors) so here's one.
 
 > [!WARNING]
-> This project is in *very* early stages of development, even basic editing is ~~not~~ *barely* usable.
-> Once it actually works properly I might change the name to *mediocre-editor* or something.
+> This project is still in development, there are bugs and some things are not implemented yet.
+> Once it works properly I might change the name to *mediocre-editor* or something.
 
 ## Demo on Asciinema
-<a href="https://asciinema.org/a/731869" target="_blank" rel="noopener noreferrer"><img src="https://asciinema.org/a/731869.svg" /></a>
+<a href="https://asciinema.org/a/797202" target="_blank" rel="noopener noreferrer"><img src="https://asciinema.org/a/797202.svg" /></a>
 
 ## Goals:
 
 > [!IMPORTANT]
-> These are long term goals, none of them are fully implemented yet. Progress is being tracked in [issue #1](https://github.com/Andriamanitra/bad-editor/issues/1).
+> These are long term goals, many of them are not fully implemented yet. Progress is being tracked in [issue #1](https://github.com/Andriamanitra/bad-editor/issues/1).
 
 * Multicursors
 * Mouse support
