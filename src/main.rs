@@ -4,6 +4,8 @@ use bad_editor::{App, cli};
 use crossterm::ExecutableCommand;
 use crossterm::cursor::{Hide as HideCursor, Show as ShowCursor};
 use crossterm::event::{
+    DisableBracketedPaste,
+    EnableBracketedPaste,
     DisableMouseCapture,
     EnableMouseCapture,
     KeyboardEnhancementFlags,
@@ -25,6 +27,7 @@ impl Drop for TerminalGuard {
         let _ = stdout().execute(ShowCursor);
         let _ = stdout().execute(PopKeyboardEnhancementFlags);
         let _ = stdout().execute(DisableMouseCapture);
+        let _ = stdout().execute(DisableBracketedPaste);
     }
 }
 
@@ -49,6 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     stdout().execute(HideCursor)?;
     stdout().execute(EnterAlternateScreen)?;
     stdout().execute(EnableMouseCapture)?;
+    stdout().execute(EnableBracketedPaste)?;
     stdout().execute(PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
 
     app.run(&mut stdout())?;
