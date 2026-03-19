@@ -2,15 +2,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::cli::FilePathWithOptionalLocation;
-use crate::clipboard::Clipboard;
+use crate::clipboard::InternalClipboard;
 use crate::highlighter::BadHighlighterManager;
 use crate::prompt_completer::CmdCompleter;
 use crate::{Action, Pane};
-
-#[cfg(not(target_os = "android"))]
-type PlatformClipboard = crate::clipboard::arboard::ArboardClipboard;
-#[cfg(target_os = "android")]
-type PlatformClipboard = crate::clipboard::termux::TermuxClipboard;
 
 pub(crate) enum AppState {
     Idle,
@@ -24,7 +19,7 @@ pub struct App {
     pub(crate) action_queue: VecDeque<Action>,
     pub(crate) highlighting: Arc<BadHighlighterManager>,
     pub(crate) prompt_completer: CmdCompleter,
-    pub(crate) clipboard: PlatformClipboard,
+    pub(crate) clipboard: InternalClipboard,
     pub(crate) dirs: Option<directories::ProjectDirs>,
     info: Option<String>,
 }
@@ -40,7 +35,7 @@ impl App {
             action_queue: VecDeque::new(),
             highlighting: Arc::new(highlighting),
             prompt_completer,
-            clipboard: PlatformClipboard::new(),
+            clipboard: InternalClipboard::new(),
             dirs: None,
             info: None,
         }
@@ -290,23 +285,19 @@ impl App {
             }
             Action::SetInfo(s) => self.inform(s),
             Action::HandledByPane(pa) => self.current_pane_mut().handle_event(pa),
-            Action::Copy => {
-                if let Err(err) = self.clipboard.copy(self.current_pane().selections()) {
-                    self.inform(err.to_string());
-                }
-            }
+            Action::Copy => self.clipboard.copy(self.current_pane().selections()),
             Action::Cut => {
                 let cuts = self.current_pane_mut().cut();
-                if let Err(err) = self.clipboard.copy(cuts) {
-                    self.inform(err.to_string())
-                }
+                self.clipboard.copy(cuts);
             }
             Action::Paste => {
-                if let Err(err) = self.clipboard.update_from_external() {
-                    self.inform(err.to_string());
-                }
                 let clips = self.clipboard.content().to_vec();
-                self.current_pane_mut().insert_from_clipboard(&clips);
+                if clips.is_empty() {
+                    self.inform("Internal clipboard is empty. Use Ctrl+Shift+v to paste from external clipboard.".into());
+                } else {
+                    self.info.take();
+                    self.current_pane_mut().insert_from_clipboard(&clips);
+                }
             }
             Action::Save => {
                 self.current_pane_mut().save();

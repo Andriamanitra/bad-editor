@@ -27,21 +27,12 @@ unicode-segmentation = "1.12.0"
 unicode-width = "0.2.1"
 unicode_names2 = "2.0.0"
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
-arboard = { version = "3.6.1", default-features = false }
-
 [dev-dependencies]
 rstest = "0.26.1"
 
 [build-dependencies]
 syntect = "5.2.0"
 ec4rs = "1.2.0"
-
-[features]
-# Enable the `wayland-data-control` feature of arboard.
-# If enabled, the data-control protocol will be prioritized over the X clipboard.
-# Read more: https://docs.rs/crate/arboard/3.6.1
-wayland-clipboard = ["arboard/wayland-data-control"]
 
 [profile.dev.build-override]
 # Enabling optimizations for build.rs seems to improve compile times
