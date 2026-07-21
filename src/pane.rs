@@ -521,6 +521,11 @@ impl Pane {
                         }
                     }
                     self.adjust_viewport();
+                } else {
+                    for cursor in self.cursors.iter_mut() {
+                        cursor.move_to(&self.content, MoveTarget::NextWordBoundaryLeft);
+                        cursor.select_to(&self.content, MoveTarget::NextWordBoundaryRight);
+                    }
                 }
             }
             PaneAction::ScrollDown(n) => {
