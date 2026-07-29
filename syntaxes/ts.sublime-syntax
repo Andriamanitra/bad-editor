@@ -1,0 +1,31 @@
+%YAML 1.2
+---
+name: ts
+scope: source.ts
+version: 2
+
+file_extensions:
+  - ts
+  - mts
+  - cts
+
+contexts:
+  main:
+    - include: typescript
+    - include: scope:source.js#main
+
+  typescript:
+    - match: '\b(interface|type|enum|namespace|module)\b'
+      scope: keyword.ts
+
+    - match: '\b(any|unknown|never|void|undefined|object|string|number|bigint|boolean|symbol)\b'
+      scope: support.type.primitive.ts
+
+    - match: '\b(keyof|typeof|infer|is|asserts|satisfies|readonly|abstract|declare)\b'
+      scope: keyword.operator.ts
+
+    - match: '(?<=\w)(\?)?\s*:'
+      scope: punctuation.separator.type.ts
+
+    - match: '@(?={{identifier}})'
+      scope: punctuation.definition.annotation.ts

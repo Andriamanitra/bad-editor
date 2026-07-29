@@ -19,7 +19,8 @@ variables:
 
   keywords: |-
     (?x:
-        break
+        await
+      | break
       | case
       | catch
       | class
@@ -60,6 +61,7 @@ variables:
       | yield
      # technically identifiers with special meanings
       | async
+      | constructor
       | get
       | set
       | of

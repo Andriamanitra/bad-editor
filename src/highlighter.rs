@@ -55,7 +55,7 @@ impl BadHighlighterManager {
                 ..ThemeSettings::default()
             },
             scopes: theme_scopes![
-                "string.quoted,punctuation.definition.string" = "#E6DB74"
+                "string.quoted,punctuation.definition.string,string.template" = "#E6DB74"
                 "comment,punctuation.definition.comment" = "#75715E"
                 "keyword,storage,punctuation.separator,punctuation.terminator,punctuation.accessor,punctuation.definition.block" = "#D6006B"
                 "constant" = "#AE81FF"
