@@ -97,6 +97,11 @@ impl EditBatch {
                     new_size = replacement.len();
                 }
                 edits.push(Edit::Delete(selection));
+            } else {
+                if let Some(replacement) = transform(String::new()) {
+                    edits.push(Edit::insert_str(cursor.offset, &replacement));
+                    new_size = replacement.len();
+                }
             }
             selection_sizes_after.push(new_size);
         }
