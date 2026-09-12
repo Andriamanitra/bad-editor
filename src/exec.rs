@@ -41,7 +41,7 @@ fn execute_interactive_command(command: Command) -> Result<(), ExecError> {
             // member of a background process group or we'll get a nasty crash
             // with no error message!
             libc::signal(libc::SIGTTOU, libc::SIG_IGN);
-            
+
             // It is important for the child to be in a new process group so it
             // can become the foreground process group on its own. 0 is a sentinel
             // value for creating a new process group.
@@ -72,7 +72,7 @@ fn execute_interactive_command(command: Command) -> Result<(), ExecError> {
             Some(code) => println!("\nExited with status code {code} (press Enter to return to editor)"),
             None => println!("\nProcess terminated by signal (press Enter to return to editor)")
         }
-        
+
         let mut buf = String::new();
         std::io::stdin().read_line(&mut buf)?;
         Ok(())
@@ -96,22 +96,26 @@ fn execute_interactive_command(command: Command) -> Result<(), ExecError> {
     result
 }
 
-fn command_from_template(template: &str, path: &Path) -> Result<Command, ExecError> {
-    let filled_template = if template.contains("%f") {
-        let stringified_path = path.to_str().ok_or(ExecError::NonUTF8Path)?;
-        &template.replace("%f", stringified_path)
-    } else {
-        template
-    };
-    let parts = shlex::split(filled_template).ok_or(ExecError::InvalidTemplate)?;
+fn parse_command(s: &str) -> Result<Command, ExecError> {
+    let parts = shlex::split(s).ok_or(ExecError::InvalidTemplate)?;
     let (cmd, args) = parts.split_first().ok_or(ExecError::InvalidTemplate)?;
     let mut cmd = Command::new(cmd);
     cmd.args(args);
     Ok(cmd)
 }
 
+pub fn execute_interactive_command_from_string(template: &str) -> Result<(), ExecError> {
+    let command = parse_command(template)?;
+    execute_interactive_command(command)
+}
+
 pub fn execute_interactive_command_from_template(template: &str, path: &Path) -> Result<(), ExecError> {
-    let command = command_from_template(template, path)?;
-    execute_interactive_command(command)?;
-    Ok(())
+    let filled_template = if template.contains("%f") {
+        let stringified_path = path.to_str().ok_or(ExecError::NonUTF8Path)?;
+        &template.replace("%f", stringified_path)
+    } else {
+        template
+    };
+    let command = parse_command(filled_template)?;
+    execute_interactive_command(command)
 }

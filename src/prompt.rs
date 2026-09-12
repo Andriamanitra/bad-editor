@@ -15,6 +15,7 @@ use reedline::{
 
 use crate::app::AppState;
 use crate::cli::FilePathWithOptionalLocation;
+use crate::exec::execute_interactive_command_from_string;
 use crate::exec::execute_interactive_command_from_template;
 use crate::prompt_completer::CmdCompleter;
 use crate::{Action, App, MoveTarget, PaneAction};
@@ -49,6 +50,10 @@ impl App {
         self.clear_status_msg();
         if let Some(shell_command) = s.strip_prefix("|") {
             self.current_pane_mut().pipe_through_shell_command(shell_command);
+            return
+        }
+        if let Some(shell_command) = s.strip_prefix("!") {
+            let _ = execute_interactive_command_from_string(shell_command);
             return
         }
         let (command, arg) = s.split_once(' ').unwrap_or((s, ""));
