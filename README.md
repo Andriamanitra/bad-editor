@@ -7,7 +7,7 @@ The world obviously needs more [text editors](https://github.com/stars/Andriaman
 > Once it works properly I might change the name to *mediocre-editor* or something.
 
 ## Demo on Asciinema
-<a href="https://asciinema.org/a/797202" target="_blank" rel="noopener noreferrer"><img src="https://asciinema.org/a/797202.svg" /></a>
+<a href="https://asciinema.org/a/797202" target="_blank" rel="noopener noreferrer"><img src="https://asciinema.org/a/797202.svg" alt="asciinema demo" /></a>
 
 ## Goals:
 
