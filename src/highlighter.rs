@@ -118,7 +118,7 @@ pub struct BadHighlighter {
 }
 
 impl BadHighlighter {
-    const MAX_LINE_LENGTH_FOR_HIGHLIGHTING: usize = 1024;
+    pub(crate) const MAX_LINE_LENGTH_FOR_HIGHLIGHTING: usize = 1024;
 
     pub fn for_file<P: AsRef<std::path::Path>>(file_path: P, manager: Arc<BadHighlighterManager>) -> Self {
         let syntax = match manager.syntax_set.find_syntax_for_file(file_path) {
@@ -229,11 +229,21 @@ impl BadHighlighter {
             let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
             HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()).collect()
         } else {
-            let style = self.manager.highlighter().style_for_stack(self.highlight_state.path.as_slice());
-            vec![(style, line)]
+            vec![(self.current_style(), line)]
         };
         self.current_line += 1;
         self.memorize_current_state();
         highlights.into_iter()
+    }
+
+    pub fn highlight_long_line(&mut self) -> Style {
+        let style = self.current_style();
+        self.current_line += 1;
+        self.memorize_current_state();
+        style
+    }
+
+    fn current_style(&self) -> Style {
+        self.manager.highlighter().style_for_stack(self.highlight_state.path.as_slice())
     }
 }

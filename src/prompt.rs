@@ -123,7 +123,7 @@ impl App {
                                 let pane = self.open_file_in_new_pane(&FilePathWithOptionalLocation::from(fpath.clone()));
                                 if pane.path.is_some() && pane.content.len_bytes() == 0 {
                                     let template = include_str!("../default_config/template.sublime-syntax").replace("FTYPE", ftype);
-                                    pane.content = crate::ropebuffer::RopeBuffer::from_str(&template);
+                                    pane.set_content(crate::ropebuffer::RopeBuffer::from_str(&template));
                                 }
                             } else {
                                 self.inform("edit error: no config directory".into());

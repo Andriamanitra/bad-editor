@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{BufReader, ErrorKind, Read, Write};
 use std::num::NonZeroUsize;
@@ -56,6 +57,7 @@ pub struct Pane {
     pub(crate) cursors: MultiCursor,
     pub(crate) settings: PaneSettings,
     pub(crate) highlighter: Option<BadHighlighter>,
+    pub(crate) long_line_layout: RefCell<Option<crate::render::LongLineLayout>>,
     pub(crate) last_search: Option<String>,
     pub(crate) lints: Vec<Lint>,
     info: Option<String>,
@@ -77,6 +79,7 @@ impl Pane {
 
             settings: PaneSettings::default(),
             highlighter: None,
+            long_line_layout: RefCell::new(None),
             completer: Completer::new(),
             suggestions: None,
             last_search: None,
@@ -86,6 +89,11 @@ impl Pane {
         }
     }
 
+    pub fn set_content(&mut self, content: RopeBuffer) {
+        self.content = content;
+        self.long_line_layout.get_mut().take();
+    }
+
     pub fn new_from_file(fileloc: &FilePathWithOptionalLocation, hl: Arc<BadHighlighterManager>) -> Self {
         let mut pane = Pane::empty();
         match std::fs::File::open(&fileloc.path) {
@@ -93,7 +101,7 @@ impl Pane {
                 // TODO: do something more efficient than this
                 let mut s = String::new();
                 if BufReader::new(file).read_to_string(&mut s).is_ok() {
-                    pane.content = RopeBuffer::from_str(&s);
+                    pane.set_content(RopeBuffer::from_str(&s));
                     pane.path = Some(PathBuf::from(&fileloc.path));
                 } else {
                     pane.inform("Error reading file".into());
@@ -292,13 +300,24 @@ impl Pane {
         if edits.is_empty() {
             return
         }
-        if let Some(offset) = edits.first_edit_offset() {
+        let first_edit_offset = edits.first_edit_offset();
+        let old_line_count = self.content.len_lines();
+        if let Some(offset) = first_edit_offset {
             for hl in self.highlighter.iter_mut() {
                 let lineno = self.content.byte_to_line(offset);
                 hl.invalidate_cache_starting_from_line(lineno);
             }
         }
         self.content.do_edits(&mut self.cursors, edits);
+        if let Some(offset) = first_edit_offset {
+            let cached_layout = self.long_line_layout.get_mut();
+            let keep = cached_layout
+                .as_mut()
+                .is_none_or(|layout| layout.try_rebase_after_edit(&self.content, offset, old_line_count));
+            if !keep {
+                *cached_layout = None;
+            }
+        }
         self.modified = true;
         self.adjust_viewport();
     }

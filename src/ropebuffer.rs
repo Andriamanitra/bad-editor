@@ -12,6 +12,7 @@ pub struct RopeBuffer {
     rope: Rope,
     undo: Vec<(EditBatch, MultiCursor)>,
     redo: Vec<(EditBatch, MultiCursor)>,
+    revision: u64,
 }
 
 impl RopeBuffer {
@@ -26,6 +27,10 @@ impl RopeBuffer {
 
     pub fn len_bytes(&self) -> usize {
         self.rope.len_bytes()
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn len_lines(&self) -> usize {
@@ -47,7 +52,13 @@ impl RopeBuffer {
     pub fn byte_to_column(&self, offset: ByteOffset) -> usize {
         let line_start = self.line_to_byte(self.byte_to_line(offset));
         let line_up_to_offset = line_start..offset;
-        self.slice(&line_up_to_offset).count_grapheme_clusters()
+        let slice = self.slice(&line_up_to_offset);
+        if slice.chunks().all(|chunk| chunk.is_ascii()) {
+            // Every ASCII character is its own grapheme cluster. Line breaks are
+            // excluded here because the slice never extends past the current line.
+            return slice.len_bytes()
+        }
+        slice.count_grapheme_clusters()
     }
 
     fn byte_to_char(&self, offset: ByteOffset) -> usize {
@@ -209,6 +220,7 @@ impl RopeBuffer {
             }
         }
         self.edit_rope(&edits);
+        self.revision = self.revision.wrapping_add(1);
     }
 
     /// Restores the last state from the undo stack (if any).
@@ -218,6 +230,7 @@ impl RopeBuffer {
         if let Some((edits, old_cursors)) = self.undo.pop() {
             self.redo.push((self.inverse_of(&edits), cursors));
             self.edit_rope(&edits);
+            self.revision = self.revision.wrapping_add(1);
             old_cursors
         } else {
             cursors
@@ -231,6 +244,7 @@ impl RopeBuffer {
         if let Some((edits, old_cursors)) = self.redo.pop() {
             self.undo.push((self.inverse_of(&edits), cursors));
             self.edit_rope(&edits);
+            self.revision = self.revision.wrapping_add(1);
             old_cursors
         } else {
             cursors
@@ -368,6 +382,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn byte_to_column() {
+        let r = RopeBuffer::from_str("abc\ndef");
+        assert_eq!(r.byte_to_column(ByteOffset(2)), 2);
+        assert_eq!(r.byte_to_column(ByteOffset(5)), 1);
+
+        let r = RopeBuffer::from_str("a😀b");
+        assert_eq!(r.byte_to_column(ByteOffset(5)), 2);
+    }
+
+    #[test]
     fn find_bytes() {
         let s = "aaaba".to_string();
         let r = RopeBuffer::from_str(&s);
@@ -410,6 +434,26 @@ mod tests {
         let del = EditBatch::delete_forward_with_cursors(&cursors, &r);
         r.do_edits(&mut cursors, del);
         assert_eq!(r.to_string(), "ab");
+    }
+
+    #[test]
+    fn revision_changes_on_edits_undo_and_redo() {
+        let mut r = RopeBuffer::from_str("abc");
+        let mut cursors = MultiCursor::new();
+        cursors.move_to(&r, crate::MoveTarget::Right(2));
+
+        let revision = r.revision();
+        let del = EditBatch::delete_forward_with_cursors(&cursors, &r);
+        r.do_edits(&mut cursors, del);
+        let edited = r.revision();
+        assert_ne!(edited, revision);
+
+        cursors = r.undo(cursors);
+        let undone = r.revision();
+        assert_ne!(undone, edited);
+
+        let _ = r.redo(cursors);
+        assert_ne!(r.revision(), undone);
     }
 
     #[test]
