@@ -118,7 +118,7 @@ pub struct BadHighlighter {
 }
 
 impl BadHighlighter {
-    const MAX_LINE_LENGTH_FOR_HIGHLIGHTING: usize = 1024;
+    pub const MAX_LINE_LENGTH_FOR_HIGHLIGHTING: usize = 1024;
 
     pub fn for_file<P: AsRef<std::path::Path>>(file_path: P, manager: Arc<BadHighlighterManager>) -> Self {
         let syntax = match manager.syntax_set.find_syntax_for_file(file_path) {
@@ -224,16 +224,21 @@ impl BadHighlighter {
         }
     }
 
-    pub fn highlight_line<'t>(&mut self, line: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
-        let highlights: Vec<(Style, &'t str)> = if line.len() <= Self::MAX_LINE_LENGTH_FOR_HIGHLIGHTING {
-            let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
-            HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()).collect()
-        } else {
-            let style = self.manager.highlighter().style_for_stack(self.highlight_state.path.as_slice());
-            vec![(style, line)]
-        };
+    pub fn current_style(&self) -> Style {
+        self.manager.highlighter().style_for_stack(self.highlight_state.path.as_slice())
+    }
+
+    pub fn next_line(&mut self) {
         self.current_line += 1;
         self.memorize_current_state();
+    }
+
+    pub fn highlight_line<'t>(&mut self, line: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
+        let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
+        let highlights: Vec<(Style, &'t str)> = HighlightIterator::new(
+            &mut self.highlight_state, &ops, line, &self.manager.highlighter()
+        ).collect();
+        self.next_line();
         highlights.into_iter()
     }
 }

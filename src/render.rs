@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::time::Instant;
 
 use crossterm::QueueableCommand;
@@ -16,7 +17,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::completer::SuggestionMenu;
 use crate::highlighter::BadHighlighter;
-use crate::{App, ByteOffset};
+use crate::{App, ByteOffset, RopeExt};
 
 fn to_crossterm_style(syntect_style: SyntectStyle) -> ContentStyle {
     let fg = {
@@ -81,6 +82,13 @@ fn replacement_symbol(g: &str) -> Option<String> {
     )
 }
 
+
+#[derive(Copy, Clone, Debug)]
+enum Cur {
+    Start(ByteOffset),
+    End(ByteOffset),
+    NoSelection(ByteOffset),
+}
 struct RenderingContext {
     n_selections: usize,
     is_cursor: bool,
@@ -90,8 +98,72 @@ struct RenderingContext {
     tab_width: usize,
     token_style: ContentStyle,
     queue: Vec<(usize, usize, StyledContent<String>)>,
+    curs: VecDeque<Cur>
 }
+struct RenderingContextParams<'a> {
+    available_columns: usize,
+    tab_width: usize,
+    token_style: ContentStyle,
+    cursors: &'a crate::MultiCursor
+}
+
 impl RenderingContext {
+    fn new(params: RenderingContextParams) -> Self {
+        let RenderingContextParams { available_columns, tab_width, token_style, cursors } = params;
+        Self {
+            is_cursor: false,
+            n_selections: 0,
+            current_column: 0,
+            visible_from_column: 0,
+            available_columns,
+            tab_width,
+            token_style,
+            queue: vec![],
+            curs: {
+                let mut curs: Vec<Cur> = vec![];
+                for cursor in cursors.iter() {
+                    match cursor.selection_from {
+                        Some(sel_from) => {
+                            let a = cursor.offset.min(sel_from);
+                            let b = cursor.offset.max(sel_from);
+                            curs.push(Cur::Start(a));
+                            curs.push(Cur::End(b));
+                        }
+                        None => {
+                            curs.push(Cur::NoSelection(cursor.offset));
+                        }
+                    }
+                }
+                curs.sort_unstable_by_key(|c| match c {
+                    Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b) => *b
+                });
+                VecDeque::from(curs)
+            }
+        }
+    }
+
+    fn next_cursor_offset(&self) -> ByteOffset {
+        match self.curs.front() {
+            Some(Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b)) => *b,
+            None => ByteOffset::MAX,
+        }
+    }
+
+    fn check_cursors_up_to(&mut self, byte_offset: ByteOffset) {
+        self.is_cursor = false;
+        while self.next_cursor_offset() <= byte_offset {
+            match self.curs.front() {
+                Some(Cur::Start(_)) => self.n_selections += 1,
+                Some(Cur::End(_)) => self.n_selections -= 1,
+                Some(Cur::NoSelection(b)) if b == &byte_offset => {
+                    self.is_cursor = true;
+                }
+                _ => {}
+            }
+            self.curs.pop_front();
+        }
+    }
+
     fn is_selection(&self) -> bool {
         self.n_selections > 0
     }
@@ -320,43 +392,6 @@ impl App {
         let completions_style = ContentStyle::new().with(LIGHT_GREY).on(SLIGHTLY_LIGHTER_BG);
         let lineno_style = ContentStyle::new().with(LIGHT_GREY).on(LIGHTER_BG);
 
-        macro_rules! peek {
-            ($it:expr) => {
-                match $it.peek() {
-                    Some(Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b)) => *b,
-                    None => ByteOffset::MAX,
-                }
-            }
-        }
-
-        #[derive(Copy, Clone, Debug)]
-        enum Cur {
-            Start(ByteOffset),
-            End(ByteOffset),
-            NoSelection(ByteOffset),
-        }
-
-        let mut curs = {
-            let mut curs: Vec<Cur> = vec![];
-            for cursor in current_pane.cursors.iter() {
-                match cursor.selection_from {
-                    Some(sel_from) => {
-                        let a = cursor.offset.min(sel_from);
-                        let b = cursor.offset.max(sel_from);
-                        curs.push(Cur::Start(a));
-                        curs.push(Cur::End(b));
-                    }
-                    None => {
-                        curs.push(Cur::NoSelection(cursor.offset));
-                    }
-                }
-            }
-            curs.sort_unstable_by_key(|c| match c {
-                Cur::Start(b) | Cur::End(b) | Cur::NoSelection(b) => *b
-            });
-            curs.into_iter().peekable()
-        };
-
         let mut last_visible_lineno = current_pane.viewport_position_row + current_pane.viewport_height as usize;
         let max_lineno_width = {
             let mut n = content.len_lines();
@@ -368,16 +403,12 @@ impl App {
             w
         };
 
-        let mut ctx = RenderingContext {
-            is_cursor: false,
-            n_selections: 0,
-            current_column: 0,
-            visible_from_column: 0,
+        let mut ctx = RenderingContext::new(RenderingContextParams {
             available_columns: (wsize.columns as usize).saturating_sub(max_lineno_width + 2),
             tab_width: current_pane.settings.tab_width,
             token_style: default_style,
-            queue: vec![],
-        };
+            cursors: &current_pane.cursors
+        });
 
         let mut console_row: u16 = 0;
         writer.queue(MoveTo(0, 0))?;
@@ -391,31 +422,50 @@ impl App {
                 break
             }
             let one_based_lineno = 1 + lineno;
-            let line = line.to_string();
             ctx.visible_from_column = 0;
             ctx.current_column = 0;
 
-            for (style, s) in hl.highlight_line(&line) {
-                ctx.token_style = to_crossterm_style(style);
-                for g in s.graphemes(true) {
-                    ctx.is_cursor = false;
-                    while peek!(curs) <= byte_offset {
-                        match curs.peek() {
-                            Some(Cur::Start(_)) => ctx.n_selections += 1,
-                            Some(Cur::End(_)) => ctx.n_selections -= 1,
-                            Some(Cur::NoSelection(b)) if b == &byte_offset => {
-                                ctx.is_cursor = true;
-                            }
-                            _ => {}
+            if line.len_bytes() > BadHighlighter::MAX_LINE_LENGTH_FOR_HIGHLIGHTING {
+                ctx.token_style = to_crossterm_style(hl.current_style());
+                let line_start = byte_offset;
+                let visible_from = if lineno == primary_cursor_line {
+                    let mut pr = ByteOffset(primary_cursor_offset.0 - line_start.0);
+                    for _ in 0..ctx.available_columns {
+                        if let Some(prev_boundary) = line.previous_boundary_from(pr) {
+                            pr = prev_boundary;
+                        } else {
+                            break
                         }
-                        curs.next();
                     }
-                    grapheme_representation(g, &mut ctx);
+                    pr.0
+                } else {
+                    0
+                };
+                byte_offset.0 += visible_from;
+                for g in line.byte_slice(visible_from..).graphemes().take(2 * ctx.available_columns) {
+                    ctx.check_cursors_up_to(byte_offset);
+                    grapheme_representation(&g.to_string(), &mut ctx);
                     if byte_offset == primary_cursor_offset {
                         let required_columns = ctx.current_column;
                         ctx.visible_from_column = required_columns.saturating_sub(ctx.available_columns.saturating_sub(1));
                     }
-                    byte_offset.0 += g.len();
+                    byte_offset.0 += g.len_bytes();
+                }
+                byte_offset.0 = line_start.0 + line.len_bytes();
+                hl.next_line();
+            } else {
+                let line = line.to_string();
+                for (style, s) in hl.highlight_line(&line) {
+                    ctx.token_style = to_crossterm_style(style);
+                    for g in s.graphemes(true) {
+                        ctx.check_cursors_up_to(byte_offset);
+                        grapheme_representation(g, &mut ctx);
+                        if byte_offset == primary_cursor_offset {
+                            let required_columns = ctx.current_column;
+                            ctx.visible_from_column = required_columns.saturating_sub(ctx.available_columns.saturating_sub(1));
+                        }
+                        byte_offset.0 += g.len();
+                    }
                 }
             }
 
