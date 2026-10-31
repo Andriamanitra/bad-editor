@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::ops::Range;
 
 use ropey::{Rope, RopeSlice};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::cursor::Cursor;
 use crate::editing::{Edit, EditBatch};
@@ -47,7 +48,11 @@ impl RopeBuffer {
     pub fn byte_to_column(&self, offset: ByteOffset) -> usize {
         let line_start = self.line_to_byte(self.byte_to_line(offset));
         let line_up_to_offset = line_start..offset;
-        self.slice(&line_up_to_offset).count_grapheme_clusters()
+        let slice = self.slice(&line_up_to_offset);
+        slice.chunks().map(|chunk|
+            if chunk.is_ascii() { chunk.len() }
+            else { chunk.graphemes(true).count() }
+        ).sum()
     }
 
     fn byte_to_char(&self, offset: ByteOffset) -> usize {
