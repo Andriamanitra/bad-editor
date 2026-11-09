@@ -160,6 +160,10 @@ pub fn get_action(ev: &event::Event) -> Action {
                 // In other terminals the event for Ctrl+Backspace seems to just look like Ctrl+h.
                 KeyCode::Char('h') if ctrl => Action::HandledByPane(PaneAction::DeleteWord),
                 KeyCode::Delete => Action::HandledByPane(PaneAction::DeleteForward),
+                KeyCode::F(3) => Action::HandledByPane(
+                    if shift { PaneAction::RepeatFindBackward }
+                    else     { PaneAction::RepeatFind }
+                ),
                 KeyCode::F(5) => Action::Command("exec".into()),
                 KeyCode::F(6) => Action::Command("lint".into()),
                 KeyCode::Esc => Action::Esc,
