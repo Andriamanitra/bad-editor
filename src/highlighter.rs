@@ -199,7 +199,7 @@ impl BadHighlighter {
         let mut clone = self.clone();
         clone.skip_to_line(target_line, text);
         let line = text.lines_at(clone.current_line).next().unwrap().to_string();
-        let ops: Vec<_> = clone.parse_state.parse_line(&line, &clone.manager.syntax_set).unwrap_or_default();
+        let ops = clone.parse_state.parse_line(&line, &clone.manager.syntax_set).unwrap_or_default().ops;
         let pp = ops.partition_point(|(i, _)| *i <= col_offset);
         for _ in HighlightIterator::new(&mut clone.highlight_state, &ops[..pp], &line, &clone.manager.highlighter()) {}
         clone.highlight_state.path
@@ -207,7 +207,7 @@ impl BadHighlighter {
 
     fn parse_line(&mut self, line: &str) {
         if line.len() <= Self::MAX_LINE_LENGTH_FOR_HIGHLIGHTING {
-            let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
+            let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default().ops;
             for _ in HighlightIterator::new(&mut self.highlight_state, &ops, line, &self.manager.highlighter()) {}
         }
         self.current_line += 1;
@@ -234,7 +234,7 @@ impl BadHighlighter {
     }
 
     pub fn highlight_line<'t>(&mut self, line: &'t str) -> impl Iterator<Item = (Style, &'t str)> {
-        let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default();
+        let ops = self.parse_state.parse_line(line, &self.manager.syntax_set).unwrap_or_default().ops;
         let highlights: Vec<(Style, &'t str)> = HighlightIterator::new(
             &mut self.highlight_state, &ops, line, &self.manager.highlighter()
         ).collect();
